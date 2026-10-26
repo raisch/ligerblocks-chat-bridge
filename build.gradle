@@ -61,3 +61,33 @@ sourceSets.main.resources.srcDir tasks.named('generateModMetadata')
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+tasks.register('verifyModJar') {
+    dependsOn tasks.named('jar')
+
+    doLast {
+        def artifact = tasks.named('jar', Jar).get().archiveFile.get().asFile
+        def entryPoint = 'com/ligerbots/ligerblockschatbridge/LigerBlocksChatBridge.class'
+        def metadataPath = 'META-INF/neoforge.mods.toml'
+        def expectedModId = mod_id
+        def expectedVersion = mod_version
+        def expectedMinecraftRange = minecraft_version_range
+        def expectedNeoForgeRange = "[${neo_version},)"
+
+        assert artifact.isFile(): "Missing mod artifact: ${artifact}"
+        new java.util.zip.ZipFile(artifact).withCloseable { archive ->
+            assert archive.getEntry(entryPoint) != null: "Missing mod entry point: ${entryPoint}"
+            def metadata = archive.getInputStream(archive.getEntry(metadataPath)).getText('UTF-8')
+            assert metadata.contains("modId=\"${expectedModId}\""): 'Expanded mod ID is missing'
+            assert metadata.contains("version=\"${expectedVersion}\""): 'Expanded mod version is missing'
+            assert metadata.contains("versionRange=\"${expectedMinecraftRange}\""): 'Minecraft compatibility range is missing'
+            assert metadata.contains("versionRange=\"${expectedNeoForgeRange}\""): 'NeoForge compatibility range is missing'
+        }
+
+        logger.lifecycle("Verified ${artifact.name}: entry point and expanded NeoForge metadata are present")
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyModJar')
+}

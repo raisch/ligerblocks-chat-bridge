@@ -73,11 +73,11 @@ remain a release gate and are included below for completeness.
 
 ## 4. Milestones
 
-### Milestone 1 — NeoForge module and early packaging gate
+### Milestone 1 — NeoForge module and early packaging gate (**COMPLETE**)
 
-**Status:** Base skeleton exists in the workspace. This milestone is complete
-when the acceptance checks below continue to pass and the mod loads in the
-target dedicated-server environment.
+**Status:** Complete for the repository's local NeoForge dedicated-server
+environment. The acceptance checks below pass with Java 21, and the mod reaches
+the normal dedicated-server ready state.
 
 **Work**
 
@@ -102,6 +102,19 @@ target dedicated-server environment.
 
 **Exit gate:** No Slack feature work starts until production packaging feasibility
 is known and the basic server load is verified.
+
+**Milestone 1 verification record (2026-10-26):**
+
+- `./gradlew clean build` passes with the included Gradle wrapper and Java 21.
+- `build/libs/ligerblocks_chat_bridge-0.1.0.jar` contains
+  `LigerBlocksChatBridge.class` and expanded `META-INF/neoforge.mods.toml`.
+- `./gradlew runServer` loads `ligerblocks_chat_bridge` and reaches the normal
+  `Done (...)! For help, type "help"` state without a client mod.
+- The production packaging decision is NeoForge Jar-in-Jar packaging for the
+  future Slack SDK. No Slack SDK is included in Milestone 1, so the current
+  production JAR has no external runtime dependency to resolve. When the SDK is
+  added, its embedded dependency graph must pass the same clean-server smoke
+  test before Slack feature work proceeds.
 
 ### Milestone 2 — Minecraft chat to Slack
 

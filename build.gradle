@@ -6,6 +6,57 @@ plugins {
 group = mod_group_id
 version = mod_version
 
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    localRuntime
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    implementation('com.slack.api:bolt-socket-mode:1.52.0')
+    implementation('com.slack.api:bolt:1.52.0')
+    implementation('com.slack.api:slack-api-model:1.52.0')
+    implementation('com.slack.api:slack-api-client:1.52.0')
+    implementation('com.slack.api:slack-app-backend:1.52.0')
+    implementation('javax.websocket:javax.websocket-api:1.1')
+    implementation('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20')
+    localRuntime('com.slack.api:bolt-socket-mode:1.52.0')
+    localRuntime('com.slack.api:bolt:1.52.0')
+    localRuntime('com.slack.api:slack-api-model:1.52.0')
+    localRuntime('com.slack.api:slack-api-client:1.52.0')
+    localRuntime('com.slack.api:slack-app-backend:1.52.0')
+    localRuntime('javax.websocket:javax.websocket-api:1.1')
+    localRuntime('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20')
+    runtimeOnly('com.slack.api:bolt-socket-mode:1.52.0')
+    runtimeOnly('com.slack.api:bolt:1.52.0')
+    runtimeOnly('com.slack.api:slack-api-model:1.52.0')
+    runtimeOnly('com.slack.api:slack-api-client:1.52.0')
+    runtimeOnly('com.slack.api:slack-app-backend:1.52.0')
+    runtimeOnly('javax.websocket:javax.websocket-api:1.1')
+    runtimeOnly('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20')
+    jarJar(implementation('com.slack.api:bolt-socket-mode:1.52.0'))
+    jarJar(implementation('com.slack.api:bolt:1.52.0'))
+    jarJar(implementation('com.slack.api:slack-api-model:1.52.0'))
+    jarJar(implementation('com.slack.api:slack-api-client:1.52.0'))
+    jarJar(implementation('com.slack.api:slack-app-backend:1.52.0'))
+    jarJar(implementation('javax.websocket:javax.websocket-api:1.1'))
+    jarJar(implementation('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20'))
+    testImplementation(platform('org.junit:junit-bom:5.11.4'))
+    testImplementation('org.junit.jupiter:junit-jupiter')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher')
+}
+
+configurations.configureEach {
+    resolutionStrategy.force(
+            'com.google.code.gson:gson:2.10.1',
+            'org.apache.commons:commons-lang3:3.14.0',
+            'org.slf4j:slf4j-api:2.0.9'
+    )
+}
+
 base {
     archivesName = mod_id
 }
@@ -27,6 +78,21 @@ neoForge {
         server {
             server()
             programArgument '--nogui'
+            additionalRuntimeClasspathConfiguration.extendsFrom(configurations.runtimeClasspath)
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('com.slack.api:bolt-socket-mode:1.52.0'))
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('com.slack.api:bolt:1.52.0'))
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('com.slack.api:slack-api-model:1.52.0'))
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('com.slack.api:slack-api-client:1.52.0'))
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('com.slack.api:slack-app-backend:1.52.0'))
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('javax.websocket:javax.websocket-api:1.1'))
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20'))
         }
     }
 
@@ -60,6 +126,10 @@ sourceSets.main.resources.srcDir tasks.named('generateModMetadata')
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 tasks.register('verifyModJar') {

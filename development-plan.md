@@ -116,7 +116,11 @@ is known and the basic server load is verified.
   added, its embedded dependency graph must pass the same clean-server smoke
   test before Slack feature work proceeds.
 
-### Milestone 2 — Minecraft chat to Slack
+### Milestone 2 — Minecraft chat to Slack (**COMPLETE**)
+
+**Status:** Complete for the outbound relay path. The implementation uses a
+bounded asynchronous sender and Java's standard HTTP client, with secrets
+loaded only from environment variables or a mounted secret file.
 
 **Work**
 
@@ -145,7 +149,29 @@ is known and the basic server load is verified.
 - Disabled relay configuration produces no Slack connection or outbound
   messages.
 
+**Milestone 2 implementation record (2026-10-26):**
+
+- `BridgeConfig` registers ordinary NeoForge common configuration for relay
+  enablement, channel ID, message format, and bounded queue capacity.
+- `SecretProvider` reads `LIGERBLOCKS_SLACK_BOT_TOKEN` or
+  `LIGERBLOCKS_SLACK_BOT_TOKEN_FILE`; token values are never logged or written
+  to config.
+- `ServerChatEvent` creates immutable `OutboundMessage` data and enqueues it;
+  Slack HTTP work runs on the `ligerblocks-slack-sender` worker.
+- Queue saturation rejects messages with an observable warning. Delivery
+  failures are logged without message contents, and HTTP 429 `Retry-After`
+  delays are honored for one retry, capped at 60 seconds.
+- `ServerStoppingEvent` stops the worker and clears pending messages.
+- Focused tests cover formatting, token-shape validation, asynchronous
+  delivery, stopped queues, queue capacity rejection, and retry-delay data.
+- `./gradlew --no-daemon test` passes with 6 tests.
+
 ### Milestone 3 — Slack to Minecraft, channel filtering, and thread safety
+
+**Status:** Implementation and focused tests are complete. Final acceptance is
+pending a successful live Socket Mode message test against a packaged server;
+the ModDev development run currently reports a missing transitive Slack SDK
+class after startup, so this milestone is not yet marked complete.
 
 **Work**
 
@@ -158,6 +184,21 @@ is known and the basic server load is verified.
 - Dispatch accepted messages onto the Minecraft server thread before accessing
   player manager or broadcasting.
 - Add tests for event filtering, formatter behavior, and dispatch decisions.
+
+**Implementation record (2026-10-26):**
+
+- `SlackSocketModeClient` owns the Bolt Socket Mode lifecycle and registers
+  message events.
+- `SlackMessageFilter` accepts only ordinary messages from the exact configured
+  channel and rejects blank, bot-originated, and subtype messages.
+- `SlackInboundDispatcher` formats accepted messages and schedules broadcasting
+  through the Minecraft server executor.
+- Focused tests cover channel filtering and server-thread dispatch.
+- The production build and test suite pass. A live development-server run
+  reaches the normal `Done (...)!` state, but the SDK classloader still reports
+  `com/slack/api/util/json/JavaTimeInstantFactory` when constructing the Socket
+  Mode client. The server-side startup path now reports that failure without
+  crashing Minecraft.
 
 **Acceptance criteria**
 

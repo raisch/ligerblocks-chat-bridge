@@ -74,6 +74,8 @@ tasks.register('slackApiClientRuntimeJar', Jar) {
             .filter { it.name.startsWith('slack-api-client-') || it.name.startsWith('slack-api-model-') }
             .collect { zipTree(it) }) {
         exclude('META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA')
+        exclude('com/google/gson/**', 'com/google/errorprone/**',
+                'org/apache/commons/lang3/**', 'org/slf4j/**')
     }
 }
 
@@ -144,6 +146,8 @@ tasks.named('jar', Jar) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(configurations.slackEmbed.collect { zipTree(it) }) {
         exclude('META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA')
+        exclude('com/google/gson/**', 'com/google/errorprone/**',
+                'org/apache/commons/lang3/**', 'org/slf4j/**')
     }
 }
 
@@ -165,6 +169,14 @@ tasks.register('verifyModJar') {
             assert archive.getEntry('com/slack/api/bolt/App.class') != null: 'Embedded Slack Bolt classes are missing'
             assert archive.getEntry('com/slack/api/util/json/JavaTimeInstantFactory.class') != null:
                     'Embedded Slack model classes are missing'
+            assert archive.getEntry('com/google/gson/Gson.class') == null:
+                    'Gson classes must be provided by NeoForge, not embedded in the mod'
+            assert archive.getEntry('com/google/errorprone/annotations/CheckReturnValue.class') == null:
+                    'Error Prone annotations must be provided by NeoForge, not embedded in the mod'
+            assert archive.getEntry('org/apache/commons/lang3/StringUtils.class') == null:
+                    'Apache Commons classes must be provided by NeoForge, not embedded in the mod'
+            assert archive.getEntry('org/slf4j/Logger.class') == null:
+                    'SLF4J classes must be provided by NeoForge, not embedded in the mod'
             def metadata = archive.getInputStream(archive.getEntry(metadataPath)).getText('UTF-8')
             assert metadata.contains("modId=\"${expectedModId}\""): 'Expanded mod ID is missing'
             assert metadata.contains("version=\"${expectedVersion}\""): 'Expanded mod version is missing'
@@ -178,4 +190,22 @@ tasks.register('verifyModJar') {
 
 tasks.named('check') {
     dependsOn tasks.named('verifyModJar')
+}
+
+tasks.register('createChecksums') {
+    dependsOn tasks.named('jar')
+    doLast {
+        def artifact = tasks.named('jar', Jar).get().archiveFile.get().asFile
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(artifact.bytes)
+                .collect { String.format('%02x', it) }
+                .join()
+        def checksumFile = new File(artifact.parentFile, "${artifact.name}.sha256")
+        checksumFile.text = "${digest}  ${artifact.name}${System.lineSeparator()}"
+        logger.lifecycle("Wrote ${checksumFile.name}")
+    }
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('createChecksums')
 }

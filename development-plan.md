@@ -309,7 +309,10 @@ recovery acceptance are complete.
 - SDK diagnostic details are captured for unexpected statuses or slow calls
   without logging credentials.
 
-### Milestone 6 — Release build and Docker acceptance
+### Milestone 6 — Release build and Docker acceptance (**COMPLETE**)
+
+**Status:** Complete. Release packaging, deployment definition, Docker smoke,
+and end-to-end acceptance are complete.
 
 **Work**
 
@@ -320,6 +323,25 @@ recovery acceptance are complete.
   independent restarts.
 - Document installation, configuration, permissions/scopes, troubleshooting,
   and upgrade/rollback steps.
+
+**Implementation record (2026-10-27):**
+
+- Added a Java 21 NeoForge Docker Compose deployment using a persistent
+  `minecraft-data` volume and environment-injected Slack credentials.
+- Added release SHA-256 checksum generation to the Gradle build.
+- Documented Docker installation, secret handling, persistence, restart,
+  upgrade, rollback, and Slack permission requirements.
+- Fixed production-JAR split-package conflicts by excluding NeoForge-provided
+  Gson, Error Prone annotations, Apache Commons Lang, and SLF4J packages.
+- Docker smoke validation confirmed the production JAR loads in NeoForge
+  21.1.256 on Java 21, the server reaches `Done`, the server-start message is
+  delivered to Slack, and Socket Mode connects.
+- End-to-end Docker validation confirmed server start/stop, player join/leave,
+  Slack-to-Minecraft messages, Minecraft-to-Slack messages, and advancement
+  notifications.
+- Network outage validation confirmed Socket Mode disconnect diagnostics and
+  automatic reconnection after internet connectivity was restored.
+- Milestone 6 was accepted as complete on 2026-10-27.
 
 **Acceptance criteria**
 

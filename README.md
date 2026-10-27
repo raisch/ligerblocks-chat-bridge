@@ -65,6 +65,52 @@ shutdown and server-stop notification test.
 The metadata rejects incompatible Minecraft and NeoForge versions before the
 mod is loaded.
 
+## Docker deployment
+
+The included [docker-compose.yml](./docker-compose.yml) runs a persistent
+NeoForge 1.21.1 server with Java 21 and mounts the built bridge mod read-only.
+Build the release artifact first:
+
+```sh
+./gradlew clean build
+sha256sum -c build/libs/ligerblocks_chat_bridge-0.1.0.jar.sha256
+```
+
+Create two local secret files with restrictive permissions. Keep them outside
+source control:
+
+```sh
+mkdir -p secrets
+printf '%s\n' 'xoxb-...' > secrets/slack-bot-token
+printf '%s\n' 'xapp-...' > secrets/slack-app-token
+chmod 600 secrets/slack-bot-token secrets/slack-app-token
+docker compose up -d
+docker compose logs -f minecraft
+```
+
+Compose mounts these files as Docker secrets. They are not written to the
+ordinary Minecraft configuration or included in the mod JAR.
+
+The `minecraft-data` volume preserves the world, NeoForge configuration, and
+logs across container recreation. Stop and recreate the container with:
+
+```sh
+docker compose down
+docker compose up -d
+```
+
+The bridge mod is upgraded by replacing the mounted JAR and recreating the
+container. Keep a copy of the previous JAR for rollback, then restore it and
+recreate the container if the new version is unsuitable. The Minecraft server
+must be fully stopped before replacing the JAR.
+
+The container image manages the NeoForge server installation. The bridge
+requires the Slack bot to have `channels:history` and `users:read`, the app
+token to have `connections:write`, and the bot to be a member of the
+configured channel. Socket Mode reconnects automatically after transient
+network loss; persistent Slack outages are reported in the server log and
+outbound messages remain bounded by `relay.queueCapacity`.
+
 ## Outbound Slack relay
 
 The relay is disabled by default. Enable it in

@@ -1,0 +1,32 @@
+services:
+  minecraft:
+    image: itzg/minecraft-server:java21
+    container_name: ligerblocks-minecraft
+    restart: unless-stopped
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: NEOFORGE
+      VERSION: "1.21.1"
+      NEOFORGE_VERSION: "21.1.256"
+      MEMORY: ${MINECRAFT_MEMORY:-2G}
+      OPS: CoachRob
+      ENABLE_ROLLING_LOGS: "true"
+      LIGERBLOCKS_SLACK_BOT_TOKEN_FILE: /run/secrets/slack_bot_token
+      LIGERBLOCKS_SLACK_APP_TOKEN_FILE: /run/secrets/slack_app_token
+    secrets:
+      - slack_bot_token
+      - slack_app_token
+    volumes:
+      - minecraft-data:/data
+      - ./build/libs/ligerblocks_chat_bridge-0.1.0.jar:/data/mods/ligerblocks_chat_bridge-0.1.0.jar:ro
+
+volumes:
+  minecraft-data:
+
+secrets:
+  slack_bot_token:
+    file: ./secrets/slack-bot-token
+  slack_app_token:
+    file: ./secrets/slack-app-token

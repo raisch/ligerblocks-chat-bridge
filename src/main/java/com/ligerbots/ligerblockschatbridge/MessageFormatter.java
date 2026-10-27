@@ -9,4 +9,8 @@ final class MessageFormatter {
                 .replace("{player}", playerName)
                 .replace("{message}", message);
     }
+
+    static String formatEvent(String event) {
+        return "[Server] " + event;
+    }
 }

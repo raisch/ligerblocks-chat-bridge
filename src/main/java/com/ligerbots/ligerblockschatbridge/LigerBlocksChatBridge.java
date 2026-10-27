@@ -1,6 +1,7 @@
 package com.ligerbots.ligerblockschatbridge;
 
 import com.mojang.logging.LogUtils;
+import net.minecraft.advancements.Advancement;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.MinecraftServer;
@@ -10,6 +11,9 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.ServerChatEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.player.AdvancementEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.slf4j.Logger;
@@ -35,8 +39,9 @@ public class LigerBlocksChatBridge {
         }
 
         String channelId = BridgeConfig.CHANNEL_ID.get().trim();
-        if (channelId.isEmpty()) {
-            LOGGER.error("Slack relay is enabled but relay.channelId is empty; outbound relay is disabled");
+        String configError = BridgeConfig.validateRelay(channelId, BridgeConfig.MESSAGE_FORMAT.get());
+        if (configError != null) {
+            LOGGER.error("Slack relay configuration is invalid: {}; outbound relay is disabled", configError);
             return;
         }
 
@@ -58,6 +63,9 @@ public class LigerBlocksChatBridge {
                 new HttpSlackMessageClient(botToken));
         outboundQueue.start();
         LOGGER.info("Slack outbound relay started for configured channel");
+        if (BridgeConfig.SERVER_START_NOTIFICATIONS.get()) {
+            enqueueEvent(channelId, "server started");
+        }
 
         String appToken;
         try {
@@ -82,7 +90,7 @@ public class LigerBlocksChatBridge {
             inboundClient.start();
         } catch (Exception | LinkageError failure) {
             inboundClient = null;
-            LOGGER.error("Slack inbound relay failed to start: {}", failure.getMessage());
+            LOGGER.error("Slack inbound relay failed to start", failure);
         }
     }
 
@@ -102,11 +110,46 @@ public class LigerBlocksChatBridge {
     }
 
     @SubscribeEvent
+    public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (BridgeConfig.JOIN_NOTIFICATIONS.get() && event.getEntity() instanceof ServerPlayer player) {
+            enqueueEvent(player.getGameProfile().getName() + " joined");
+        }
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (BridgeConfig.LEAVE_NOTIFICATIONS.get() && event.getEntity() instanceof ServerPlayer player) {
+            enqueueEvent(player.getGameProfile().getName() + " left");
+        }
+    }
+
+    @SubscribeEvent
+    public void onPlayerDeath(LivingDeathEvent event) {
+        if (BridgeConfig.DEATH_NOTIFICATIONS.get() && event.getEntity() instanceof ServerPlayer player) {
+            enqueueEvent(player.getCombatTracker().getDeathMessage().getString());
+        }
+    }
+
+    @SubscribeEvent
+    public void onAdvancementEarned(AdvancementEvent.AdvancementEarnEvent event) {
+        if (BridgeConfig.ADVANCEMENT_NOTIFICATIONS.get()
+                && event.getEntity() instanceof ServerPlayer player) {
+            String advancement = Advancement.name(event.getAdvancement()).getString();
+            enqueueEvent(player.getGameProfile().getName() + " earned advancement: " + advancement);
+        }
+    }
+
+    @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         OutboundMessageQueue queue = outboundQueue;
         outboundQueue = null;
         if (queue != null) {
-            queue.close();
+            if (BridgeConfig.SERVER_STOP_NOTIFICATIONS.get()) {
+                LOGGER.info("Sending Slack server-stop notification before relay shutdown");
+                queue.closeWithFinalMessage(eventMessage("server stopping"));
+            } else {
+                queue.close();
+            }
             LOGGER.info("Slack outbound relay stopped");
         }
         SlackSocketModeClient client = inboundClient;
@@ -115,6 +158,25 @@ public class LigerBlocksChatBridge {
             client.close();
             LOGGER.info("Slack Socket Mode relay stopped");
         }
+    }
+
+    private void enqueueEvent(String event) {
+        enqueueEvent(BridgeConfig.CHANNEL_ID.get().trim(), event);
+    }
+
+    private void enqueueEvent(String channelId, String event) {
+        OutboundMessageQueue queue = outboundQueue;
+        if (queue != null) {
+            queue.enqueue(eventMessage(channelId, event));
+        }
+    }
+
+    private OutboundMessage eventMessage(String event) {
+        return eventMessage(BridgeConfig.CHANNEL_ID.get().trim(), event);
+    }
+
+    private OutboundMessage eventMessage(String channelId, String event) {
+        return new OutboundMessage(channelId, MessageFormatter.formatEvent(event));
     }
 
 }

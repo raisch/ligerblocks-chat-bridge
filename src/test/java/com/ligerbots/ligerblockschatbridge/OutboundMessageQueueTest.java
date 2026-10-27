@@ -59,4 +59,39 @@ class OutboundMessageQueueTest {
 
         assertEquals(1_500, exception.retryAfterMillis());
     }
+
+    @Test
+    void retriesTransientSlackFailuresWithBoundedAttempts() {
+        AtomicInteger sends = new AtomicInteger();
+        OutboundMessageQueue queue = new OutboundMessageQueue(1, (channel, text) -> {
+            if (sends.getAndIncrement() < 2) {
+                throw new SlackApiException("temporary failure", 0);
+            }
+        });
+        queue.start();
+        assertTrue(queue.enqueue(new OutboundMessage("C123", "message")));
+
+        for (int attempt = 0; attempt < 400 && sends.get() < 3; attempt++) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        queue.close();
+        assertEquals(3, sends.get());
+    }
+
+    @Test
+    void deliversFinalMessageBeforeClosing() {
+        AtomicInteger sends = new AtomicInteger();
+        OutboundMessageQueue queue = new OutboundMessageQueue(1, (channel, text) -> sends.incrementAndGet());
+        queue.start();
+
+        queue.closeWithFinalMessage(new OutboundMessage("C123", "server stopping"));
+
+        assertEquals(1, sends.get());
+    }
 }

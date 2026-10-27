@@ -49,6 +49,10 @@ The server should log `LigerBlocks Chat Bridge loaded` and reach the normal
 Minecraft client mod is required. The generated `run/` directory is ignored by
 Git and can be removed between smoke tests.
 
+The development server forwards terminal input to Minecraft. Type `stop` in
+the same terminal after the server reaches the ready state for a graceful
+shutdown and server-stop notification test.
+
 ## Installation
 
 1. Run `./gradlew clean build`.
@@ -72,6 +76,12 @@ enabled = true
 channelId = "C0123456789"
 messageFormat = "<{player}> {message}"
 queueCapacity = 256
+joinNotifications = true
+leaveNotifications = true
+deathNotifications = true
+advancementNotifications = true
+serverStartNotifications = true
+serverStopNotifications = true
 ```
 
 The channel ID is an ordinary configuration value. The Slack bot token must
@@ -99,8 +109,14 @@ token:
 
 The direct token environment variable takes precedence. In the Slack app
 configuration, enable Socket Mode, grant the app-level token the
-`connections:write` scope, subscribe to message events, and reinstall the app
-after changing scopes. The bot must be a member of the configured channel.
+`connections:write` scope, grant the bot `users:read`, subscribe to message
+events, and reinstall the app after changing scopes. The bot must be a member
+of the configured channel.
+
+The server log reports Socket Mode connection attempts, confirmed connections
+and reconnections, unexpected disconnects, connection errors, and intentional
+shutdown. The Slack SDK's automatic reconnect behavior is reported in
+disconnect diagnostics.
 
 Only ordinary messages from the exact configured channel are accepted. Bot
 messages, edited/deleted messages, thread subtypes, blank messages, and
@@ -115,20 +131,52 @@ app-level token is never written to configuration or logs.
 Minecraft chat events are converted to immutable outbound messages and placed
 on a bounded queue. The server thread never performs the Slack HTTP request.
 When the queue is full, the message is rejected and a warning is emitted.
-Slack HTTP/API failures are logged without message contents or credentials.
-HTTP 429 responses honor the `Retry-After` delay, capped at 60 seconds, and
-retry the failed delivery once. Server shutdown stops the sender and clears
-queued messages.
+Inbound Slack messages and successfully queued or delivered outbound Slack
+messages are logged with their channel and message text to simplify
+troubleshooting. Tokens are never logged. Slack HTTP/API failures are logged
+with the failure details. HTTP 429 responses honor the `Retry-After` delay,
+capped at 60 seconds. Transient delivery failures use at most three attempts
+with bounded exponential backoff. Server shutdown stops the sender and clears
+queued messages after the final shutdown notification is attempted.
+
+Server and player lifecycle notifications use the same outbound queue:
+
+- `[Server] server started`
+- `[Server] CoachRob joined`
+- `[Server] CoachRob left`
+- `[Server] CoachRob died`
+- `[Server] CoachRob earned advancement: Stone Age`
+- `[Server] server stopping`
+
+Each notification type can be disabled independently with the corresponding
+configuration value above. The server-stop notification is delivered before
+the outbound worker shuts down, subject to normal Slack availability and the
+configured shutdown timeout.
 
 ## Slack SDK packaging decision
 
 Milestone 2 uses Java's standard HTTP client for the outbound Web API call, so
 the production JAR still has no external Slack runtime dependency.
 
-The Socket Mode implementation uses NeoForge Jar-in-Jar packaging for the
-Slack SDK and Tyrus WebSocket runtime. The development server run also adds
-the SDK to its additional runtime classpath. A separate bridge service is not
+The Socket Mode implementation embeds the Slack SDK and Tyrus WebSocket
+runtime classes directly in the mod JAR. This avoids NeoForge classloader
+isolation between the Slack SDK modules. A separate bridge service is not
 required.
+
+The application reads exported environment variables; it does not parse a
+`.env` file automatically. For local testing, load the file into the process
+environment before starting the server:
+
+```sh
+set -a
+. ./.env
+set +a
+./gradlew runServer
+```
+
+Set `relay.channelId` in
+`config/ligerblocks_chat_bridge-common.toml`; `LIGERBLOCKS_CHANNEL_ID` is not
+read as a replacement for the ordinary NeoForge configuration value.
 
 ## Compatibility
 

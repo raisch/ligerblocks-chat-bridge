@@ -166,12 +166,10 @@ loaded only from environment variables or a mounted secret file.
   delivery, stopped queues, queue capacity rejection, and retry-delay data.
 - `./gradlew --no-daemon test` passes with 6 tests.
 
-### Milestone 3 — Slack to Minecraft, channel filtering, and thread safety
+### Milestone 3 — Slack to Minecraft, channel filtering, and thread safety (**COMPLETE**)
 
-**Status:** Implementation and focused tests are complete. Final acceptance is
-pending a successful live Socket Mode message test against a packaged server;
-the ModDev development run currently reports a missing transitive Slack SDK
-class after startup, so this milestone is not yet marked complete.
+**Status:** Complete. Implementation, focused tests, packaged SDK loading, and
+live Socket Mode message delivery have been verified.
 
 **Work**
 
@@ -194,11 +192,20 @@ class after startup, so this milestone is not yet marked complete.
 - `SlackInboundDispatcher` formats accepted messages and schedules broadcasting
   through the Minecraft server executor.
 - Focused tests cover channel filtering and server-thread dispatch.
-- The production build and test suite pass. A live development-server run
-  reaches the normal `Done (...)!` state, but the SDK classloader still reports
-  `com/slack/api/util/json/JavaTimeInstantFactory` when constructing the Socket
-  Mode client. The server-side startup path now reports that failure without
-  crashing Minecraft.
+- The production build and test suite pass. NeoForge's isolated Jar-in-Jar
+  classloaders prevented `slack-api-client` from seeing
+  `JavaTimeInstantFactory` in `slack-api-model`, so the Slack SDK runtime is
+  now merged into the mod JAR's classloader. The packaged artifact verifies
+  both the Bolt entry point and the previously missing model class.
+- The ModDev `runServer` configuration uses a matching merged
+  `slack-api-client`/`slack-api-model` development runtime JAR. With the
+  environment loaded, the server reaches `Done (...)!` and opens a Socket Mode
+  session.
+- A live Socket Mode message test with real credentials succeeded. Messages
+  from the configured Slack channel were broadcast to Minecraft with the
+  resolved Slack display name, for example `[Slack] <CoachRob> message`.
+- Sender display names are resolved through Slack `users.info` and cached for
+  the server session; the required `users:read` bot scope is documented.
 
 **Acceptance criteria**
 
@@ -213,7 +220,10 @@ class after startup, so this milestone is not yet marked complete.
 - Slack connection failures are reported explicitly; no false "connected"
   status is logged for an unsuccessful connection.
 
-### Milestone 4 — Player and server events
+### Milestone 4 — Player and server events (**COMPLETE**)
+
+**Status:** Complete. Implementation, focused tests, and live acceptance are
+complete.
 
 **Work**
 
@@ -225,6 +235,21 @@ class after startup, so this milestone is not yet marked complete.
   collect Minecraft state on the server thread and return a snapshot to the
   Slack callback rather than accessing server state there.
 
+**Implementation record (2026-10-26):**
+
+- Added independent configuration toggles for join, leave, death, advancement,
+  server-start, and server-stop notifications.
+- Added NeoForge handlers for player login/logout, player death, advancement
+  completion, server start, and server stopping.
+- All notification state is read on the Minecraft event thread and messages
+  use the existing bounded outbound queue.
+- Server-stop notifications use a bounded final queue drain before worker
+  shutdown.
+- Focused tests cover event formatting and final shutdown delivery.
+- Live validation confirmed server-start, player join, player leave, advancement,
+  bidirectional chat, and server-stop delivery in Slack.
+- Milestone 4 was accepted as complete on 2026-10-26.
+
 **Acceptance criteria**
 
 - Each enabled event emits one correctly formatted Slack message for the
@@ -235,7 +260,10 @@ class after startup, so this milestone is not yet marked complete.
 - Server startup/shutdown and player events remain functional when Slack is
   temporarily unavailable; failures are surfaced without crashing Minecraft.
 
-### Milestone 5 — Reliability, configuration, and operational visibility
+### Milestone 5 — Reliability, configuration, and operational visibility (**COMPLETE**)
+
+**Status:** Complete. Implementation, automated validation, and live outage 
+recovery acceptance are complete.
 
 **Work**
 
@@ -248,6 +276,22 @@ class after startup, so this milestone is not yet marked complete.
   exposing secrets or message contents unnecessarily.
 - Test independent Slack and Minecraft outages/restarts, including repeated
   start/stop cycles.
+
+**Implementation record (2026-10-26):**
+
+- Added startup validation for Slack channel IDs and message format
+  placeholders, with actionable diagnostics and no misleading ready state.
+- Added bounded three-attempt delivery retries with `Retry-After` handling and
+  exponential backoff for transient Slack failures.
+- Added slow-request and unexpected Slack HTTP/API response diagnostics without
+  logging credentials.
+- Added unit coverage for relay configuration validation, retry behavior, and
+  existing queue overflow/shutdown behavior.
+- Verified `./gradlew clean build` succeeds.
+- Live validation disconnected the server from the internet, observed Slack API
+  timeout diagnostics without a Minecraft crash, and confirmed automatic
+  Socket Mode recovery after connectivity returned with a new session.
+- Milestone 5 was accepted as complete on 2026-10-26.
 
 **Acceptance criteria**
 

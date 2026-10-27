@@ -6,6 +6,8 @@ import java.util.concurrent.TimeUnit;
 
 final class OutboundMessageQueue implements AutoCloseable {
     private static final System.Logger LOGGER = System.getLogger(OutboundMessageQueue.class.getName());
+    private static final int MAX_DELIVERY_ATTEMPTS = 3;
+    private static final long INITIAL_RETRY_WAIT_MILLIS = 1_000;
     private static final long MAX_RETRY_WAIT_MILLIS = 60_000;
     private final ArrayBlockingQueue<OutboundMessage> queue;
     private final SlackMessageClient client;
@@ -33,6 +35,8 @@ final class OutboundMessageQueue implements AutoCloseable {
                     + (running ? "full" : "stopped"));
             return false;
         }
+        LOGGER.log(System.Logger.Level.INFO, "Queued outbound Slack message to channel "
+                + message.channelId() + ": " + message.text());
         return true;
     }
 
@@ -49,7 +53,7 @@ final class OutboundMessageQueue implements AutoCloseable {
                 }
                 deliver(message);
             } catch (InterruptedException interrupted) {
-                if (!running) {
+                if (!running && queue.isEmpty()) {
                     Thread.currentThread().interrupt();
                     return;
                 }
@@ -58,31 +62,70 @@ final class OutboundMessageQueue implements AutoCloseable {
     }
 
     private void deliver(OutboundMessage message) {
-        try {
-            client.sendMessage(message.channelId(), message.text());
-        } catch (SlackApiException apiFailure) {
-            long retryAfter = Math.min(apiFailure.retryAfterMillis(), MAX_RETRY_WAIT_MILLIS);
-            LOGGER.log(System.Logger.Level.ERROR, "Slack delivery failed: " + apiFailure.getMessage());
-            if (retryAfter > 0) {
+        long retryWait = INITIAL_RETRY_WAIT_MILLIS;
+        for (int attempt = 1; attempt <= MAX_DELIVERY_ATTEMPTS; attempt++) {
+            try {
+                client.sendMessage(message.channelId(), message.text());
+                LOGGER.log(System.Logger.Level.INFO, "Sent outbound Slack message to channel "
+                        + message.channelId() + (attempt == 1 ? "" : " after retry") + ": " + message.text());
+                return;
+            } catch (SlackApiException apiFailure) {
+                LOGGER.log(System.Logger.Level.ERROR, "Slack delivery attempt " + attempt + " failed: "
+                        + apiFailure.getMessage());
+                retryWait = apiFailure.retryAfterMillis() > 0
+                        ? Math.min(apiFailure.retryAfterMillis(), MAX_RETRY_WAIT_MILLIS)
+                        : retryWait;
+            } catch (IOException | RuntimeException failure) {
+                LOGGER.log(System.Logger.Level.ERROR, "Slack delivery attempt " + attempt + " failed: "
+                        + failure.getMessage());
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+
+            if (attempt < MAX_DELIVERY_ATTEMPTS) {
                 try {
-                    Thread.sleep(retryAfter);
-                    client.sendMessage(message.channelId(), message.text());
+                    LOGGER.log(System.Logger.Level.WARNING, "Retrying Slack delivery in " + retryWait + " ms");
+                    Thread.sleep(retryWait);
+                    retryWait = Math.min(retryWait * 2, MAX_RETRY_WAIT_MILLIS);
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
-                } catch (IOException | RuntimeException retryFailure) {
-                    LOGGER.log(System.Logger.Level.ERROR, "Slack delivery retry failed: " + retryFailure.getMessage());
+                    return;
                 }
+            } else {
+                LOGGER.log(System.Logger.Level.ERROR, "Slack delivery abandoned after "
+                        + MAX_DELIVERY_ATTEMPTS + " attempts");
             }
-        } catch (IOException | RuntimeException failure) {
-            LOGGER.log(System.Logger.Level.ERROR, "Slack delivery failed: " + failure.getMessage());
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
         }
     }
 
     @Override
     public synchronized void close() {
         running = false;
+        queue.clear();
+        stopWorker();
+    }
+
+    synchronized void closeWithFinalMessage(OutboundMessage message) {
+        if (!running) {
+            close();
+            return;
+        }
+        queue.clear();
+        running = false;
+        stopWorker();
+        Thread finalDelivery = new Thread(() -> deliver(message), "ligerblocks-slack-shutdown");
+        finalDelivery.setDaemon(true);
+        finalDelivery.start();
+        try {
+            finalDelivery.join(5_000);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        queue.clear();
+    }
+
+    private void stopWorker() {
         if (worker != null) {
             worker.interrupt();
             try {
@@ -92,6 +135,5 @@ final class OutboundMessageQueue implements AutoCloseable {
             }
             worker = null;
         }
-        queue.clear();
     }
 }

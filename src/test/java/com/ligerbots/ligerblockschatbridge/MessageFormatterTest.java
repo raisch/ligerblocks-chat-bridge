@@ -10,4 +10,9 @@ class MessageFormatterTest {
         assertEquals("[Alex] hello", MessageFormatter.format(
                 "[{player}] {message}", "Alex", "hello"));
     }
+
+    @Test
+    void formatsServerEvents() {
+        assertEquals("[Server] Alex joined", MessageFormatter.formatEvent("Alex joined"));
+    }
 }

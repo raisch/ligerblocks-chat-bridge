@@ -12,38 +12,38 @@ repositories {
 
 configurations {
     localRuntime
+    slackEmbed
+    slackDevRuntime
     runtimeClasspath.extendsFrom localRuntime
 }
 
 dependencies {
-    implementation('com.slack.api:bolt-socket-mode:1.52.0')
-    implementation('com.slack.api:bolt:1.52.0')
-    implementation('com.slack.api:slack-api-model:1.52.0')
-    implementation('com.slack.api:slack-api-client:1.52.0')
-    implementation('com.slack.api:slack-app-backend:1.52.0')
-    implementation('javax.websocket:javax.websocket-api:1.1')
-    implementation('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20')
-    localRuntime('com.slack.api:bolt-socket-mode:1.52.0')
-    localRuntime('com.slack.api:bolt:1.52.0')
-    localRuntime('com.slack.api:slack-api-model:1.52.0')
-    localRuntime('com.slack.api:slack-api-client:1.52.0')
-    localRuntime('com.slack.api:slack-app-backend:1.52.0')
-    localRuntime('javax.websocket:javax.websocket-api:1.1')
-    localRuntime('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20')
-    runtimeOnly('com.slack.api:bolt-socket-mode:1.52.0')
-    runtimeOnly('com.slack.api:bolt:1.52.0')
-    runtimeOnly('com.slack.api:slack-api-model:1.52.0')
-    runtimeOnly('com.slack.api:slack-api-client:1.52.0')
-    runtimeOnly('com.slack.api:slack-app-backend:1.52.0')
-    runtimeOnly('javax.websocket:javax.websocket-api:1.1')
-    runtimeOnly('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20')
-    jarJar(implementation('com.slack.api:bolt-socket-mode:1.52.0'))
-    jarJar(implementation('com.slack.api:bolt:1.52.0'))
-    jarJar(implementation('com.slack.api:slack-api-model:1.52.0'))
-    jarJar(implementation('com.slack.api:slack-api-client:1.52.0'))
-    jarJar(implementation('com.slack.api:slack-app-backend:1.52.0'))
-    jarJar(implementation('javax.websocket:javax.websocket-api:1.1'))
-    jarJar(implementation('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20'))
+    compileOnly('com.slack.api:bolt-socket-mode:1.52.0')
+    compileOnly('com.slack.api:bolt:1.52.0')
+    compileOnly('com.slack.api:slack-api-model:1.52.0')
+    compileOnly('com.slack.api:slack-api-client:1.52.0')
+    compileOnly('com.slack.api:slack-app-backend:1.52.0')
+    compileOnly('javax.websocket:javax.websocket-api:1.1')
+    compileOnly('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20')
+    slackEmbed('com.slack.api:bolt-socket-mode:1.52.0')
+    slackEmbed('com.slack.api:bolt:1.52.0')
+    slackEmbed('com.slack.api:slack-api-model:1.52.0')
+    slackEmbed('com.slack.api:slack-api-client:1.52.0')
+    slackEmbed('com.slack.api:slack-app-backend:1.52.0')
+    slackEmbed('javax.websocket:javax.websocket-api:1.1')
+    slackEmbed('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20')
+    ['com.slack.api:bolt-socket-mode:1.52.0',
+     'com.slack.api:bolt:1.52.0',
+     'com.slack.api:slack-app-backend:1.52.0',
+     'javax.websocket:javax.websocket-api:1.1',
+     'org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20'].each { dependency ->
+        slackDevRuntime(dependency) {
+            if (dependency.startsWith('com.slack.api:')) {
+                exclude group: 'com.slack.api', module: 'slack-api-client'
+                exclude group: 'com.slack.api', module: 'slack-api-model'
+            }
+        }
+    }
     testImplementation(platform('org.junit:junit-bom:5.11.4'))
     testImplementation('org.junit.jupiter:junit-jupiter')
     testRuntimeOnly('org.junit.platform:junit-platform-launcher')
@@ -51,7 +51,7 @@ dependencies {
 
 configurations.configureEach {
     resolutionStrategy.force(
-            'com.google.code.gson:gson:2.10.1',
+            'com.google.code.gson:gson:2.12.1',
             'org.apache.commons:commons-lang3:3.14.0',
             'org.slf4j:slf4j-api:2.0.9'
     )
@@ -67,6 +67,28 @@ java {
     }
 }
 
+tasks.register('slackApiClientRuntimeJar', Jar) {
+    archiveBaseName = 'ligerblocks-slack-api-client-runtime'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(configurations.slackEmbed
+            .filter { it.name.startsWith('slack-api-client-') || it.name.startsWith('slack-api-model-') }
+            .collect { zipTree(it) }) {
+        exclude('META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA')
+    }
+}
+
+dependencies.add(
+        'slackDevRuntime',
+        project.dependencies.create(project.files(tasks.named('slackApiClientRuntimeJar'))))
+
+tasks.matching { it.name == 'prepareServerRun' }.configureEach {
+    dependsOn tasks.named('slackApiClientRuntimeJar')
+}
+
+tasks.matching { it.name == 'runServer' }.configureEach {
+    standardInput = System.in
+}
+
 neoForge {
     version = neo_version
 
@@ -78,21 +100,7 @@ neoForge {
         server {
             server()
             programArgument '--nogui'
-            additionalRuntimeClasspathConfiguration.extendsFrom(configurations.runtimeClasspath)
-            additionalRuntimeClasspathConfiguration.dependencies.add(
-                    project.dependencies.create('com.slack.api:bolt-socket-mode:1.52.0'))
-            additionalRuntimeClasspathConfiguration.dependencies.add(
-                    project.dependencies.create('com.slack.api:bolt:1.52.0'))
-            additionalRuntimeClasspathConfiguration.dependencies.add(
-                    project.dependencies.create('com.slack.api:slack-api-model:1.52.0'))
-            additionalRuntimeClasspathConfiguration.dependencies.add(
-                    project.dependencies.create('com.slack.api:slack-api-client:1.52.0'))
-            additionalRuntimeClasspathConfiguration.dependencies.add(
-                    project.dependencies.create('com.slack.api:slack-app-backend:1.52.0'))
-            additionalRuntimeClasspathConfiguration.dependencies.add(
-                    project.dependencies.create('javax.websocket:javax.websocket-api:1.1'))
-            additionalRuntimeClasspathConfiguration.dependencies.add(
-                    project.dependencies.create('org.glassfish.tyrus.bundles:tyrus-standalone-client:1.20'))
+            additionalRuntimeClasspathConfiguration.extendsFrom(configurations.slackDevRuntime)
         }
     }
 
@@ -132,6 +140,13 @@ tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
 
+tasks.named('jar', Jar) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(configurations.slackEmbed.collect { zipTree(it) }) {
+        exclude('META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA')
+    }
+}
+
 tasks.register('verifyModJar') {
     dependsOn tasks.named('jar')
 
@@ -147,6 +162,9 @@ tasks.register('verifyModJar') {
         assert artifact.isFile(): "Missing mod artifact: ${artifact}"
         new java.util.zip.ZipFile(artifact).withCloseable { archive ->
             assert archive.getEntry(entryPoint) != null: "Missing mod entry point: ${entryPoint}"
+            assert archive.getEntry('com/slack/api/bolt/App.class') != null: 'Embedded Slack Bolt classes are missing'
+            assert archive.getEntry('com/slack/api/util/json/JavaTimeInstantFactory.class') != null:
+                    'Embedded Slack model classes are missing'
             def metadata = archive.getInputStream(archive.getEntry(metadataPath)).getText('UTF-8')
             assert metadata.contains("modId=\"${expectedModId}\""): 'Expanded mod ID is missing'
             assert metadata.contains("version=\"${expectedVersion}\""): 'Expanded mod version is missing'

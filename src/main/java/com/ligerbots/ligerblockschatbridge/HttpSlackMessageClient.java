@@ -1,5 +1,8 @@
 package com.ligerbots.ligerblockschatbridge;
 
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -9,6 +12,7 @@ import java.time.Duration;
 import java.util.regex.Pattern;
 
 final class HttpSlackMessageClient implements SlackMessageClient {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final URI CHAT_POST_MESSAGE = URI.create("https://slack.com/api/chat.postMessage");
     private static final Pattern OK_RESPONSE = Pattern.compile("\"ok\"\\s*:\\s*true");
     private final HttpClient httpClient;
@@ -32,15 +36,26 @@ final class HttpSlackMessageClient implements SlackMessageClient {
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
 
+        long startedAt = System.nanoTime();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000;
+        if (elapsedMillis >= 1_000) {
+            LOGGER.warn("Slack chat.postMessage response was slow: status={}, durationMs={}",
+                    response.statusCode(), elapsedMillis);
+        }
         if (response.statusCode() == 429) {
+            LOGGER.warn("Slack chat.postMessage rate limited: durationMs={}", elapsedMillis);
             throw new SlackApiException("Slack rate limit response (HTTP 429)",
                     parseRetryAfterMillis(response.headers().firstValue("Retry-After").orElse(null)));
         }
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            LOGGER.warn("Slack chat.postMessage returned unexpected HTTP status {} after {} ms",
+                    response.statusCode(), elapsedMillis);
             throw new SlackApiException("Slack HTTP failure (status " + response.statusCode() + ")", 0);
         }
         if (!OK_RESPONSE.matcher(response.body()).find()) {
+            LOGGER.warn("Slack chat.postMessage returned an unsuccessful API response after {} ms",
+                    elapsedMillis);
             throw new SlackApiException("Slack API rejected chat.postMessage response", 0);
         }
     }

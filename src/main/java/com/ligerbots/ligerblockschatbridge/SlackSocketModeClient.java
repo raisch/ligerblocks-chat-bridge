@@ -4,14 +4,22 @@ import com.mojang.logging.LogUtils;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
 import com.slack.api.bolt.socket_mode.SocketModeApp;
+import com.slack.api.app_backend.slash_commands.payload.SlashCommandPayload;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.event.MessageEvent;
 import org.slf4j.Logger;
+import com.ligerbots.ligerblockschatbridge.commands.CommandRegistryManager;
+import com.ligerbots.ligerblockschatbridge.commands.SlackCommandAuthorizer;
+import com.ligerbots.ligerblockschatbridge.commands.SlackCommandHelpFormatter;
+import com.ligerbots.ligerblockschatbridge.commands.SlackCommandParser;
+import com.ligerbots.ligerblockschatbridge.commands.SlackCommandRequest;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Consumer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -28,6 +36,19 @@ final class SlackSocketModeClient implements AutoCloseable {
             String appToken,
             String channelId,
             SlackInboundDispatcher dispatcher) throws java.io.IOException {
+        this(botToken, appToken, channelId, dispatcher, null, request -> {
+        }, request -> {
+        });
+    }
+
+    SlackSocketModeClient(
+            String botToken,
+            String appToken,
+            String channelId,
+            SlackInboundDispatcher dispatcher,
+            CommandRegistryManager commandRegistry,
+            Consumer<SlackCommandRequest> commandDispatcher,
+            Consumer<SlackCommandRequest> reloadDispatcher) throws java.io.IOException {
         App app = new App(AppConfig.builder()
                 .singleTeamBotToken(botToken)
                 .build());
@@ -47,6 +68,69 @@ final class SlackSocketModeClient implements AutoCloseable {
                     identity, event.getChannel(), accepted.isPresent(), event.getText());
             accepted.ifPresent(dispatcher::dispatch);
             return context.ack();
+        });
+        app.command("/mc", (request, context) -> {
+            SlashCommandPayload payload = request.getPayload();
+            if (!channelId.equals(payload.getChannelId())) {
+                LOGGER.info("Rejected Slack /mc command from channel {}", payload.getChannelId());
+                return context.ack("This command is not available in this channel.");
+            }
+            Optional<SlackCommandParser.ParsedCommand> parsed = SlackCommandParser.parse(payload.getText());
+            if (parsed.isEmpty()) {
+                LOGGER.info("Rejected Slack /mc command from user {}: unknown or unconfigured command",
+                        payload.getUserId());
+                return context.ack("That Minecraft command is not configured.");
+            }
+            if ("help".equals(parsed.get().name())) {
+                if (commandRegistry == null || !commandRegistry.isLoaded()) {
+                    return context.ack("No Minecraft commands are configured.");
+                }
+                return context.ack(SlackCommandHelpFormatter.format(
+                        commandRegistry.activeRegistry(), payload.getUserId()));
+            }
+            if (commandRegistry == null || !commandRegistry.isLoaded()) {
+                LOGGER.info("Rejected Slack /mc command from user {}: unknown or unconfigured command",
+                        payload.getUserId());
+                return context.ack("That Minecraft command is not configured.");
+            }
+            if ("reload".equals(parsed.get().name())) {
+                if (!commandRegistry.isAdministrator(payload.getUserId())) {
+                    LOGGER.info("Rejected unauthorized Slack /mc reload from user {}", payload.getUserId());
+                    return context.ack("You are not authorized to reload Minecraft commands.");
+                }
+                reloadDispatcher.accept(new SlackCommandRequest(
+                        payload.getChannelId(),
+                        payload.getUserId(),
+                        payload.getUserName(),
+                        payload.getResponseUrl(),
+                        "reload",
+                        parsed.get().arguments()));
+                return context.ack("Minecraft command configuration reload requested.");
+            }
+            var resolution = commandRegistry.activeRegistry().resolve(parsed.get().name());
+            if (resolution.isAmbiguous()) {
+                LOGGER.info("Rejected ambiguous Slack /mc command prefix {} from user {}",
+                        parsed.get().name(), payload.getUserId());
+                return context.ack("That command prefix is ambiguous. Matches: "
+                        + String.join(", ", resolution.ambiguousNames()));
+            }
+            if (!resolution.isMatch()
+                    || !SlackCommandAuthorizer.isAuthorized(
+                            commandRegistry.activeRegistry(), resolution.mapping(), payload.getUserId(), Set.of())) {
+                LOGGER.info("Rejected unauthorized Slack /mc command {} from user {}",
+                        parsed.get().name(), payload.getUserId());
+                return context.ack("You are not authorized to use that Minecraft command.");
+            }
+            commandDispatcher.accept(new SlackCommandRequest(
+                    payload.getChannelId(),
+                    payload.getUserId(),
+                    payload.getUserName(),
+                    payload.getResponseUrl(),
+                    resolution.mapping().name(),
+                    parsed.get().arguments()));
+            LOGGER.info("Accepted Slack /mc command {} from user {}",
+                    parsed.get().name(), payload.getUserId());
+            return context.ack("Minecraft command accepted.");
         });
         this.socketModeApp = new SocketModeApp(
                 appToken,

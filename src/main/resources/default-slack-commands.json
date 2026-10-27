@@ -1,0 +1,31 @@
+{
+  "admins": [],
+  "commands": {
+    "players": {
+      "minecraft": "list",
+      "permission": "everyone",
+      "description": "Show currently online players"
+    },
+    "daytime": {
+      "minecraft": "time query daytime",
+      "permission": "everyone",
+      "description": "Show the current daytime"
+    },
+    "whitelist": {
+      "minecraft": "whitelist list",
+      "permission": "admin",
+      "description": "List whitelisted players"
+    },
+    "addplayer": {
+      "minecraft": "whitelist add {player}",
+      "permission": "admin",
+      "description": "Add a player to the whitelist",
+      "arguments": {
+        "player": {
+          "type": "minecraft_username",
+          "required": true
+        }
+      }
+    }
+  }
+}

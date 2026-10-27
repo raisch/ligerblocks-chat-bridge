@@ -128,7 +128,18 @@ deathNotifications = true
 advancementNotifications = true
 serverStartNotifications = true
 serverStopNotifications = true
+userEvents = true
+systemEvents = true
+minecraftToSlack = true
+slackToMinecraft = true
 ```
+
+`userEvents` controls player join, leave, death, and advancement notifications.
+`systemEvents` controls server-start and server-stop notifications.
+`minecraftToSlack` gates all Minecraft chat and event delivery to Slack.
+`slackToMinecraft` gates ordinary Slack messages delivered to Minecraft. These
+configuration switches are independent of the per-event notification settings
+and can be changed in the common config without changing command mappings.
 
 The channel ID is an ordinary configuration value. The Slack bot token must
 remain outside the configuration file and is loaded from one of these
@@ -184,6 +195,100 @@ with the failure details. HTTP 429 responses honor the `Retry-After` delay,
 capped at 60 seconds. Transient delivery failures use at most three attempts
 with bounded exponential backoff. Server shutdown stops the sender and clears
 queued messages after the final shutdown notification is attempted.
+
+## Slack `/mc` command executor
+
+The bridge supports a native Slack `/mc` slash command over the existing Socket
+Mode connection. No Request URL or second WebSocket is required.
+
+Configure commands in the Minecraft server's
+`config/ligerblocks_chat_bridge-slack-commands.json` file. The bundled defaults
+provide:
+
+See [COMMANDS.md](COMMANDS.md) for the complete parser reference, JSON schema,
+argument forms, validation rules, and examples.
+
+```text
+/mc players
+/mc daytime
+/mc whitelist
+/mc addplayer Steve
+```
+
+Admin mappings use the top-level `admins` list. Display names and Minecraft
+usernames are not authorization identities:
+
+```json
+{
+  "admins": ["U0123456789"],
+  "commands": {
+    "whitelist": {
+      "minecraft": "whitelist list",
+      "permission": "admin",
+      "description": "List whitelisted players"
+    }
+  }
+}
+```
+
+To configure the Slack command:
+
+1. Open <https://api.slack.com/apps> and select the bridge app.
+2. Open **Features → Slash Commands** and choose **Create New Command**.
+3. Set the command to `/mc` and describe it as `Run an allowlisted Minecraft command`.
+4. Leave **Request URL** unset because Socket Mode is already enabled.
+5. Save the command and reinstall the app if Slack requests it.
+6. Confirm the bot is a member of the configured channel.
+
+The command configuration is loaded during server startup. An administrator
+listed in the top-level `admins` list can reload an external configuration
+without restarting Minecraft:
+
+```text
+/mc reload
+```
+
+Reload parses and validates the complete replacement before publishing it. A
+failed reload leaves the previous valid registry active. The bundled defaults
+are used when the external file does not exist; `/mc reload` requires an
+external configuration file.
+
+Use the built-in help command to list the mappings available to the requesting
+Slack user:
+
+```text
+/mc help
+```
+
+Help includes each mapping's `description`, argument placeholders, and aliases.
+Admin-only mappings are omitted for non-admin users. The `help` command itself
+does not execute a Minecraft command.
+
+Command names and aliases support unique prefixes. For example, `/mc ni`
+resolves to `night` when it is the only matching command. Ambiguous prefixes
+such as `/mc n` when both `night` and `noon` exist are rejected with the
+matching command names. Exact command and alias matches always take precedence,
+and authorization is checked against the resolved canonical command.
+
+Recommended Slack test sequence:
+
+```text
+/mc players
+/mc daytime
+/mc addplayer Steve
+/mc unknown
+/mc addplayer
+/mc addplayer "not a valid username"
+/mc help
+/mc reload
+```
+
+Verify that successful commands return bounded Minecraft feedback, invalid or
+unknown commands are rejected without execution, unauthorized users cannot run
+admin mappings, and reload failures report that the previous configuration was
+retained. Test `/mc` from a non-configured channel and confirm it is rejected.
+After editing the mapping file, run `/mc reload` and verify a newly added
+mapping works without restarting the server.
 
 Server and player lifecycle notifications use the same outbound queue:
 

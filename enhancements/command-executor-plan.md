@@ -96,7 +96,7 @@ mapping file
 
 ## Implementation Steps
 
-### Phase 1 — Foundational command model and configuration
+### Phase 1 — Foundational command model and configuration ✅ Complete
 
 #### Plan 1.1: Define command registry and mapping schema
 
@@ -131,13 +131,13 @@ Use immutable records for parsed mappings and an immutable registry snapshot.
 
 **Tasks**
 
-- [ ] T001 [Plan:1.1] Define immutable command mapping, argument definition,
+- [x] T001 [Plan:1.1] Define immutable command mapping, argument definition,
   permission policy, alias, and registry types under
   `src/main/java/com/ligerbots/ligerblockschatbridge/commands/`.
-- [ ] T002 [P] [Plan:1.1] Define the Option A configuration schema and default
+- [x] T002 [P] [Plan:1.1] Define the Option A configuration schema and default
   example in `config/ligerblocks_chat_bridge-slack-commands.json` or the
   selected NeoForge config representation.
-- [ ] T003 [P] [Plan:1.1] Add parser and validator tests for valid mappings,
+- [x] T003 [P] [Plan:1.1] Add parser and validator tests for valid mappings,
   unknown permission values, missing templates, duplicate names, invalid
   placeholders, and excessive macro/output limits in
   `src/test/java/com/ligerbots/ligerblockschatbridge/commands/`.
@@ -152,14 +152,14 @@ rejected without changing active behavior.
 
 **Tasks**
 
-- [ ] T004 [Plan:1.2] Implement command registry loading, validation, and
+- [x] T004 [Plan:1.2] Implement command registry loading, validation, and
   atomic replacement in `CommandRegistryManager.java`.
-- [ ] T005 [P] [Plan:1.2] Add a reload service and actionable reload failure
+- [x] T005 [P] [Plan:1.2] Add a reload service and actionable reload failure
   logging without including credentials or sensitive command arguments.
-- [ ] T006 [P] [Plan:1.2] Test startup load, valid replacement, invalid
+- [x] T006 [P] [Plan:1.2] Test startup load, valid replacement, invalid
   replacement retention, duplicate detection, and repeated reloads.
 
-### Phase 2 — Slack Socket Mode command intake
+### Phase 2 — Slack Socket Mode command intake ✅ Complete
 
 #### Plan 2.1: Register `/mc` on the existing Socket Mode app
 
@@ -172,12 +172,12 @@ the Slack user ID, and pass a command request to the server-thread dispatcher.
 
 **Tasks**
 
-- [ ] T007 [Plan:2.1] Register the `/mc` Bolt command handler in
+- [x] T007 [Plan:2.1] Register the `/mc` Bolt command handler in
   `src/main/java/com/ligerbots/ligerblockschatbridge/SlackSocketModeClient.java`
   using the existing `SocketModeApp`.
-- [ ] T008 [P] [Plan:2.1] Add a command request model containing team, channel,
+- [x] T008 [P] [Plan:2.1] Add a command request model containing team, channel,
   Slack user ID, subcommand text, response URL/context, and request timestamp.
-- [ ] T009 [P] [Plan:2.1] Add tests for Socket Mode command parsing, empty
+- [x] T009 [P] [Plan:2.1] Add tests for Socket Mode command parsing, empty
   commands, wrong channels, unknown subcommands, and immediate acknowledgement.
 
 #### Plan 2.2: Resolve authorization
@@ -191,12 +191,12 @@ control.
 
 **Tasks**
 
-- [ ] T010 [Plan:2.2] Implement command authorization against the active
+- [x] T010 [Plan:2.2] Implement command authorization against the active
   registry and Slack user ID.
-- [ ] T011 [P] [Plan:2.2] Add authorization tests covering everyone, explicit
+- [x] T011 [P] [Plan:2.2] Add authorization tests covering everyone, explicit
   users, role membership, default deny, and channel rejection.
 
-### Phase 3 — Minecraft execution and response
+### Phase 3 — Minecraft execution and response ✅ Complete
 
 #### Plan 3.1: Parse, validate, and expand arguments
 
@@ -209,9 +209,9 @@ placeholders.
 
 **Tasks**
 
-- [ ] T012 [Plan:3.1] Implement command tokenization, typed argument
+- [x] T012 [Plan:3.1] Implement command tokenization, typed argument
   validation, placeholder expansion, aliases, and macro expansion.
-- [ ] T013 [P] [Plan:3.1] Add tests for valid arguments, missing arguments,
+- [x] T013 [P] [Plan:3.1] Add tests for valid arguments, missing arguments,
   extra arguments, invalid usernames, quoting behavior, aliases, and macro
   limits.
 
@@ -226,14 +226,14 @@ the same policy.
 
 **Tasks**
 
-- [ ] T014 [Plan:3.2] Implement server-thread command execution in
+- [x] T014 [Plan:3.2] Implement server-thread command execution in
   `MinecraftCommandExecutor.java` using a controlled `CommandSourceStack`.
-- [ ] T015 [P] [Plan:3.2] Implement bounded command feedback capture and
+- [x] T015 [P] [Plan:3.2] Implement bounded command feedback capture and
   response formatting for success, failure, denied, timeout, and unavailable
   server states.
-- [ ] T016 [P] [Plan:3.2] Add threading and executor tests proving Slack
+- [x] T016 [P] [Plan:3.2] Add threading and executor tests proving Slack
   callbacks never read or mutate Minecraft state directly.
-- [ ] T017 [Plan:3.2] Add tests for Brigadier unknown commands, insufficient
+- [x] T017 [Plan:3.2] Add tests for Brigadier unknown commands, insufficient
   permission, command failure, macro partial failure, and output truncation.
 
 #### Plan 3.3: Return responses through the outbound relay
@@ -247,12 +247,12 @@ channel with a clear requester prefix.
 
 **Tasks**
 
-- [ ] T018 [Plan:3.3] Integrate command response delivery with
+- [x] T018 [Plan:3.3] Integrate command response delivery with
   `OutboundMessageQueue.java` and preserve bounded queue/retry behavior.
-- [ ] T019 [P] [Plan:3.3] Add response-size, queue-overflow, and delivery-failure
+- [x] T019 [P] [Plan:3.3] Add response-size, queue-overflow, and delivery-failure
   tests without logging tokens.
 
-### Phase 4 — Reload, operational controls, and documentation
+### Phase 4 — Reload, operational controls, and documentation ✅ Complete
 
 #### Plan 4.1: Add controlled reload behavior
 
@@ -265,9 +265,9 @@ invalid or partial one.
 
 **Tasks**
 
-- [ ] T020 [Plan:4.1] Implement the administrator-only reload command and
+- [x] T020 [Plan:4.1] Implement the administrator-only reload command and
   server-thread-safe registry replacement.
-- [ ] T021 [P] [Plan:4.1] Add reload success/failure logging and tests for
+- [x] T021 [P] [Plan:4.1] Add reload success/failure logging and tests for
   concurrent reads during replacement.
 
 #### Plan 4.2: Document Slack app setup and end-to-end testing
@@ -308,10 +308,10 @@ instructions:
 
 **Tasks**
 
-- [ ] T022 [Plan:4.2] Document `/mc` Slack app creation, Socket Mode delivery,
+- [x] T022 [Plan:4.2] Document `/mc` Slack app creation, Socket Mode delivery,
   required permissions, mapping examples, reload procedure, and negative tests
   in `README.md`.
-- [ ] T023 [P] [Plan:4.2] Add a Docker end-to-end test checklist covering
+- [x] T023 [P] [Plan:4.2] Add a Docker end-to-end test checklist covering
   `/mc players`, `/mc daytime`, typed arguments, denied users, reload, server
   restart, Slack disconnect/reconnect, and token safety.
 

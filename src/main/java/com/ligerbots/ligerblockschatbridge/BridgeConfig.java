@@ -14,6 +14,10 @@ public final class BridgeConfig {
     public static final ModConfigSpec.BooleanValue ADVANCEMENT_NOTIFICATIONS;
     public static final ModConfigSpec.BooleanValue SERVER_START_NOTIFICATIONS;
     public static final ModConfigSpec.BooleanValue SERVER_STOP_NOTIFICATIONS;
+    public static final ModConfigSpec.BooleanValue USER_EVENTS;
+    public static final ModConfigSpec.BooleanValue SYSTEM_EVENTS;
+    public static final ModConfigSpec.BooleanValue MINECRAFT_TO_SLACK;
+    public static final ModConfigSpec.BooleanValue SLACK_TO_MINECRAFT;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -48,6 +52,18 @@ public final class BridgeConfig {
         SERVER_STOP_NOTIFICATIONS = builder
                 .comment("Send a server-stop notification to Slack.")
                 .define("serverStopNotifications", true);
+        USER_EVENTS = builder
+                .comment("Enable Minecraft user events such as join, leave, death, and advancements.")
+                .define("userEvents", true);
+        SYSTEM_EVENTS = builder
+                .comment("Enable Minecraft system events such as server start and stop.")
+                .define("systemEvents", true);
+        MINECRAFT_TO_SLACK = builder
+                .comment("Enable Minecraft chat and events sent to Slack.")
+                .define("minecraftToSlack", true);
+        SLACK_TO_MINECRAFT = builder
+                .comment("Enable ordinary Slack messages sent to Minecraft.")
+                .define("slackToMinecraft", true);
         builder.pop();
         SPEC = builder.build();
     }

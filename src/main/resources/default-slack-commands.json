@@ -12,18 +12,29 @@
       "description": "Show the current daytime"
     },
     "whitelist": {
-      "minecraft": "whitelist list",
+      "minecraft": "whitelist {action} {player}",
       "permission": "admin",
-      "description": "List whitelisted players"
-    },
-    "addplayer": {
-      "minecraft": "whitelist add {player}",
-      "permission": "admin",
-      "description": "Add a player to the whitelist",
+      "description": "List, add, or remove whitelisted players",
       "arguments": {
+        "action": {
+          "type": "option",
+          "required": true,
+          "options": [
+            "list",
+            "add",
+            "del"
+          ]
+        },
         "player": {
           "type": "minecraft_username",
-          "required": true
+          "required": false,
+          "requiredWhen": {
+            "argument": "action",
+            "values": [
+              "add",
+              "del"
+            ]
+          }
         }
       }
     }

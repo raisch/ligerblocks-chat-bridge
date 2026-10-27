@@ -65,9 +65,15 @@ final class OutboundMessageQueue implements AutoCloseable {
         long retryWait = INITIAL_RETRY_WAIT_MILLIS;
         for (int attempt = 1; attempt <= MAX_DELIVERY_ATTEMPTS; attempt++) {
             try {
-                client.sendMessage(message.channelId(), message.text());
-                LOGGER.log(System.Logger.Level.INFO, "Sent outbound Slack message to channel "
-                        + message.channelId() + (attempt == 1 ? "" : " after retry") + ": " + message.text());
+                if (message.isEphemeral()) {
+                    client.sendEphemeralResponse(message.responseUrl(), message.text());
+                    LOGGER.log(System.Logger.Level.INFO, "Sent ephemeral Slack command response"
+                            + (attempt == 1 ? "" : " after retry") + ": " + message.text());
+                } else {
+                    client.sendMessage(message.channelId(), message.text());
+                    LOGGER.log(System.Logger.Level.INFO, "Sent outbound Slack message to channel "
+                            + message.channelId() + (attempt == 1 ? "" : " after retry") + ": " + message.text());
+                }
                 return;
             } catch (SlackApiException apiFailure) {
                 LOGGER.log(System.Logger.Level.ERROR, "Slack delivery attempt " + attempt + " failed: "

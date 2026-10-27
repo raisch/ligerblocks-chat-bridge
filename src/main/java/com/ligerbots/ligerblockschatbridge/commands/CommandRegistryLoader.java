@@ -55,7 +55,7 @@ public final class CommandRegistryLoader {
 
         JsonObject root;
         try {
-            root = JsonParser.parseString(json).getAsJsonObject();
+            root = JsonParser.parseString(JsonCommentStripper.strip(json)).getAsJsonObject();
         } catch (JsonParseException | IllegalStateException parseFailure) {
             throw new CommandConfigurationException("command configuration must be a JSON object", parseFailure);
         }
@@ -83,6 +83,10 @@ public final class CommandRegistryLoader {
         return new CommandRegistry(mappings, admins);
     }
 
+    public static String withoutAdministrators(String json) throws CommandConfigurationException {
+        return JsonAdminsEditor.withoutAdmins(json);
+    }
+
     private static CommandMapping parseMapping(String name, JsonObject object)
             throws CommandConfigurationException {
         List<String> minecraftCommands = stringList(object, "minecraft");
@@ -104,9 +108,11 @@ public final class CommandRegistryLoader {
         Set<String> roles = normalizedSet(object, "roles");
         Set<String> aliases = normalizedNames(object, "aliases");
         String description = stringProperty(object, "description");
+        CommandResponseMode responseMode = CommandResponseMode.parse(stringProperty(object, "response"));
         Map<String, CommandArgumentDefinition> arguments = parseArguments(name, objectProperty(object, "arguments"));
         validatePlaceholders(name, minecraftCommands, arguments);
-        return new CommandMapping(name, minecraftCommands, permission, users, roles, arguments, aliases, description);
+        return new CommandMapping(
+                name, minecraftCommands, permission, users, roles, arguments, aliases, description, responseMode);
     }
 
     private static Map<String, CommandArgumentDefinition> parseArguments(String command, JsonObject arguments)
@@ -133,6 +139,17 @@ public final class CommandRegistryLoader {
             }
             boolean required = booleanProperty(definition, "required", true);
             List<String> options = stringList(definition, "options");
+            JsonObject requiredWhen = objectProperty(definition, "requiredWhen");
+            String requiredWhenArgument = null;
+            List<String> requiredWhenValues = List.of();
+            if (requiredWhen != null) {
+                requiredWhenArgument = stringProperty(requiredWhen, "argument");
+                requiredWhenValues = stringList(requiredWhen, "values");
+                if (requiredWhenArgument == null || requiredWhenValues.isEmpty()) {
+                    throw new CommandConfigurationException(
+                            "requiredWhen for " + name + " must define argument and values");
+                }
+            }
             if ("option".equalsIgnoreCase(type) && options.isEmpty()) {
                 throw new CommandConfigurationException(
                         "option argument " + name + " for command " + command + " must define options");
@@ -141,10 +158,29 @@ public final class CommandRegistryLoader {
                 throw new CommandConfigurationException(
                         "options are only supported for option arguments: " + name);
             }
-            definitions.put(name, new CommandArgumentDefinition(name, type, required, options));
+            definitions.put(name, new CommandArgumentDefinition(
+                    name, type, required, options, requiredWhenArgument, requiredWhenValues));
         }
         validateVariadicArguments(command, definitions);
+        validateConditionalArguments(command, definitions);
         return definitions;
+    }
+
+    private static void validateConditionalArguments(
+            String command,
+            Map<String, CommandArgumentDefinition> definitions) throws CommandConfigurationException {
+        for (CommandArgumentDefinition definition : definitions.values()) {
+            if (definition.requiredWhenArgument() != null
+                    && !definitions.containsKey(definition.requiredWhenArgument())) {
+                throw new CommandConfigurationException(
+                        "requiredWhen for " + definition.name() + " references undefined argument "
+                                + definition.requiredWhenArgument() + " in command " + command);
+            }
+            if (definition.requiredWhenArgument() != null && definition.required()) {
+                throw new CommandConfigurationException(
+                        "requiredWhen argument " + definition.name() + " must not also be unconditionally required");
+            }
+        }
     }
 
     private static void validateVariadicArguments(

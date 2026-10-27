@@ -74,4 +74,34 @@ public final class BridgeConfig {
     static String validateRelay(String channelId, String messageFormat) {
         return RelayConfigValidator.validate(channelId, messageFormat);
     }
+
+    static void setEvents(String scope, boolean enabled) {
+        switch (scope.toLowerCase(java.util.Locale.ROOT)) {
+            case "all" -> {
+                USER_EVENTS.set(enabled);
+                SYSTEM_EVENTS.set(enabled);
+            }
+            case "user" -> USER_EVENTS.set(enabled);
+            case "server" -> SYSTEM_EVENTS.set(enabled);
+            default -> throw new IllegalArgumentException("unsupported event scope: " + scope);
+        }
+    }
+
+    static String eventsStatus() {
+        return "user=" + (USER_EVENTS.get() ? "on" : "off")
+                + ", server=" + (SYSTEM_EVENTS.get() ? "on" : "off");
+    }
+
+    static void setMessages(String direction, boolean enabled) {
+        switch (direction.toLowerCase(java.util.Locale.ROOT)) {
+            case "from" -> MINECRAFT_TO_SLACK.set(enabled);
+            case "to" -> SLACK_TO_MINECRAFT.set(enabled);
+            default -> throw new IllegalArgumentException("unsupported message direction: " + direction);
+        }
+    }
+
+    static String messagesStatus() {
+        return "from=" + (MINECRAFT_TO_SLACK.get() ? "on" : "off")
+                + ", to=" + (SLACK_TO_MINECRAFT.get() ? "on" : "off");
+    }
 }

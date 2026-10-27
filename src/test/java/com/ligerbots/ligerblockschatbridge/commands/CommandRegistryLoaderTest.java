@@ -3,6 +3,7 @@ package com.ligerbots.ligerblockschatbridge.commands;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,6 +38,7 @@ class CommandRegistryLoaderTest {
 
         assertEquals("list", registry.find("players").orElseThrow().minecraftCommands().getFirst());
         assertEquals("Show online players", registry.find("players").orElseThrow().description());
+        assertEquals(CommandResponseMode.PRIVATE, registry.find("players").orElseThrow().responseMode());
         assertEquals("players", registry.find("online").orElseThrow().name());
         assertEquals(2, registry.find("morning").orElseThrow().minecraftCommands().size());
         assertEquals("minecraft_username",
@@ -64,6 +66,97 @@ class CommandRegistryLoaderTest {
         assertThrows(CommandConfigurationException.class, () -> CommandRegistryLoader.parse("""
                 {"commands":{"Players":{"minecraft":"list","permission":"everyone"}}}
                 """));
+        assertThrows(CommandConfigurationException.class, () -> CommandRegistryLoader.parse("""
+                {"commands":{"players":{
+                  "minecraft":"list","permission":"everyone","response":"broadcast"
+                }}}
+                """));
+    }
+
+    @Test
+    void loadsChannelResponseMode() throws Exception {
+        CommandRegistry registry = CommandRegistryLoader.parse("""
+                {"commands":{"announce":{
+                  "minecraft":"say hello","permission":"admin","response":"channel"
+                }}}
+                """);
+
+        assertEquals(CommandResponseMode.CHANNEL, registry.find("announce").orElseThrow().responseMode());
+    }
+
+    @Test
+    void stripsCommentsBeforeParsingWithoutChangingStringValues() throws Exception {
+        CommandRegistry registry = CommandRegistryLoader.parse("""
+                {
+                  // Public command
+                  "commands": {
+                    "announce": {
+                      "minecraft": "say https://example.test/a/*b*/",
+                      /*
+                       * Preserve comment markers inside strings: // and /*
+                       */
+                      "permission": "everyone",
+                      "description": "Use // and /* markers literally"
+                    }
+                  }
+                }
+                """);
+
+        CommandMapping mapping = registry.find("announce").orElseThrow();
+        assertEquals("say https://example.test/a/*b*/", mapping.minecraftCommands().getFirst());
+        assertEquals("Use // and /* markers literally", mapping.description());
+    }
+
+    @Test
+    void rejectsUnterminatedBlockComments() {
+        assertThrows(CommandConfigurationException.class, () -> CommandRegistryLoader.parse("""
+                {
+                  "commands": {
+                    "players": {
+                      "minecraft": "list",
+                      "permission": "everyone"
+                    }
+                  }
+                /* missing terminator
+                """));
+    }
+
+    @Test
+    void removesAdministratorsFromConfigurationView() throws Exception {
+        String view = CommandRegistryLoader.withoutAdministrators("""
+                {
+                  "admins": ["U123"],
+                  "commands": {
+                    "players": {"minecraft": "list", "permission": "everyone"}
+                  }
+                }
+                """);
+
+        assertEquals(false, view.contains("\"admins\""));
+        assertEquals("players", CommandRegistryLoader.parse(view).find("players").orElseThrow().name());
+    }
+
+    @Test
+    void loadsConditionalArgumentRequirements() throws Exception {
+        CommandRegistry registry = CommandRegistryLoader.parse("""
+                {"commands":{"whitelist":{
+                  "minecraft":"whitelist {action} {player}",
+                  "permission":"admin",
+                  "arguments":{
+                    "action":{"type":"option","options":["list","add","del"]},
+                    "player":{
+                      "type":"minecraft_username",
+                      "required":false,
+                      "requiredWhen":{"argument":"action","values":["add","del"]}
+                    }
+                  }
+                }}}
+                """);
+
+        CommandArgumentDefinition player = registry.find("whitelist").orElseThrow()
+                .arguments().get("player");
+        assertEquals("action", player.requiredWhenArgument());
+        assertEquals(List.of("add", "del"), player.requiredWhenValues());
     }
 
     @Test

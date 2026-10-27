@@ -211,9 +211,12 @@ argument forms, validation rules, and examples.
 ```text
 /mc players
 /mc daytime
-/mc whitelist
-/mc addplayer Steve
+/mc whitelist list
+/mc whitelist add Steve
 ```
+
+The loader accepts `//` single-line comments and `/* ... */` multiline
+comments. Comment markers inside quoted strings are preserved.
 
 Admin mappings use the top-level `admins` list. Display names and Minecraft
 usernames are not authorization identities:
@@ -223,9 +226,23 @@ usernames are not authorization identities:
   "admins": ["U0123456789"],
   "commands": {
     "whitelist": {
-      "minecraft": "whitelist list",
+      "minecraft": "whitelist {action} {player}",
       "permission": "admin",
-      "description": "List whitelisted players"
+      "description": "List, add, or remove whitelisted players",
+      "arguments": {
+        "action": {
+          "type": "option",
+          "options": ["list", "add", "del"]
+        },
+        "player": {
+          "type": "minecraft_username",
+          "required": false,
+          "requiredWhen": {
+            "argument": "action",
+            "values": ["add", "del"]
+          }
+        }
+      }
     }
   }
 }
@@ -261,8 +278,41 @@ Slack user:
 ```
 
 Help includes each mapping's `description`, argument placeholders, and aliases.
-Admin-only mappings are omitted for non-admin users. The `help` command itself
-does not execute a Minecraft command.
+The complete visible command list is sorted alphabetically. Admin-only mappings
+and built-in administrator commands are omitted for non-admin users. For
+administrators, those commands are shown in bold, and the first line explains
+the formatting. The `help` command itself does not execute a Minecraft command.
+
+Built-in commands include:
+
+```text
+/mc help
+/mc reload
+/mc config
+/mc admin add SLACK_ID [-reload] [-list]
+/mc admin list
+/mc admin del SLACK_ID [-reload] [-list]
+/mc events [all|user|server] [on|off]
+/mc msgs [from|to] [on|off]
+```
+
+`/mc config` returns the command JSON privately, excluding the top-level
+`admins` list. `/mc admin add`, `/mc admin list`, and `/mc admin del` manage
+administrator IDs. The final administrator cannot be removed.
+
+By default, command results are private ephemeral responses visible only to the
+invoking user. A command can explicitly publish its result to the configured
+channel with:
+
+```json
+"response": "channel"
+```
+
+The default is:
+
+```json
+"response": "private"
+```
 
 Command names and aliases support unique prefixes. For example, `/mc ni`
 resolves to `night` when it is the only matching command. Ambiguous prefixes
@@ -275,12 +325,17 @@ Recommended Slack test sequence:
 ```text
 /mc players
 /mc daytime
-/mc addplayer Steve
+/mc whitelist list
+/mc whitelist add Steve
+/mc whitelist del Steve
 /mc unknown
-/mc addplayer
-/mc addplayer "not a valid username"
+/mc whitelist add
+/mc whitelist add "not a valid username"
 /mc help
 /mc reload
+/mc config
+/mc admin list
+/mc events user off
 ```
 
 Verify that successful commands return bounded Minecraft feedback, invalid or
@@ -289,6 +344,18 @@ admin mappings, and reload failures report that the previous configuration was
 retained. Test `/mc` from a non-configured channel and confirm it is rejected.
 After editing the mapping file, run `/mc reload` and verify a newly added
 mapping works without restarting the server.
+
+The `/mc events` command changes user and server event notification switches
+at runtime. These changes are not persisted to the TOML configuration and
+return to the configured values after a server restart.
+
+The `/mc msgs` command controls message relay directions at runtime:
+
+- `from` enables or disables Minecraft chat and event messages sent to Slack.
+- `to` enables or disables ordinary Slack messages sent to Minecraft.
+
+These changes are not persisted to the TOML configuration and return to the
+configured values after a server restart.
 
 Server and player lifecycle notifications use the same outbound queue:
 

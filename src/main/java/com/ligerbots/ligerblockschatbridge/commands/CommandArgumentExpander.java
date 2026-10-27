@@ -62,10 +62,15 @@ public final class CommandArgumentExpander {
                 continue;
             }
             if (index >= orderedValues.size()) {
-                if (definition.required()) {
+                if (isRequired(definition, resolved)) {
                     throw invalid("missing required argument " + definition.name());
                 }
                 continue;
+            }
+            if (definition.requiredWhenArgument() != null && !isRequired(definition, resolved)) {
+                throw invalid("argument " + definition.name() + " is not valid for "
+                        + definition.requiredWhenArgument() + "="
+                        + resolved.get(definition.requiredWhenArgument()));
             }
             String value = orderedValues.get(index++);
             validate(definition, value);
@@ -116,6 +121,20 @@ public final class CommandArgumentExpander {
         return "rest".equalsIgnoreCase(type)
                 || "one_or_more".equalsIgnoreCase(type)
                 || "optional_one_or_more".equalsIgnoreCase(type);
+    }
+
+    private static boolean isRequired(
+            CommandArgumentDefinition definition,
+            Map<String, String> resolved) {
+        if (definition.required()) {
+            return true;
+        }
+        if (definition.requiredWhenArgument() == null) {
+            return false;
+        }
+        String controllingValue = resolved.get(definition.requiredWhenArgument());
+        return controllingValue != null && definition.requiredWhenValues().stream()
+                .anyMatch(value -> value.equalsIgnoreCase(controllingValue));
     }
 
     private static CommandConfigurationException invalid(String message) {

@@ -1,7 +1,9 @@
 package com.ligerbots.ligerblockschatbridge.commands;
 
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -12,28 +14,51 @@ public final class SlackCommandHelpFormatter {
     }
 
     public static String format(CommandRegistry registry, String userId) {
-        StringBuilder response = new StringBuilder("Available Minecraft commands:");
+        boolean administrator = SlackCommandAuthorizer.isAdministrator(registry, userId);
+        StringBuilder response = new StringBuilder(
+                "Available Minecraft commands (administrator-only commands are in bold):");
         Set<CommandMapping> visible = new LinkedHashSet<>(registry.mappings().values());
+        List<HelpEntry> entries = new ArrayList<>();
         visible.stream()
                 .filter(mapping -> SlackCommandAuthorizer.isAuthorized(registry, mapping, userId, Set.of()))
-                .sorted(Comparator.comparing(CommandMapping::name))
-                .forEach(mapping -> append(response, mapping));
-        append(response, "help", "Show available Minecraft commands.");
+                .forEach(mapping -> entries.add(new HelpEntry(mapping.name(), mapping,
+                        administrator && mapping.permission() == CommandPermission.ADMIN)));
+        entries.add(new HelpEntry("help", "Show available Minecraft commands."));
+        if (administrator) {
+            entries.add(new HelpEntry("reload", "Reload the Minecraft command configuration.", true));
+            entries.add(new HelpEntry("config", "Show the command configuration privately, excluding administrators.", true));
+            entries.add(new HelpEntry("admin add <SLACK_ID> [-reload] [-list]",
+                    "Add a Slack administrator.", true));
+            entries.add(new HelpEntry("admin list", "List Slack administrators.", true));
+            entries.add(new HelpEntry("admin del <SLACK_ID> [-reload] [-list]",
+                    "Remove a Slack administrator.", true));
+            entries.add(new HelpEntry("events <all|user|server> <on|off>",
+                    "Enable or disable Minecraft event notifications.", true));
+            entries.add(new HelpEntry("msgs <from|to> <on|off>",
+                    "Enable or disable Minecraft message relay.", true));
+        }
+        entries.stream()
+                .sorted(Comparator.comparing(HelpEntry::command))
+                .forEach(entry -> {
+                    if (entry.mapping() == null) {
+                        append(response, entry.command(), entry.description(), entry.adminOnly());
+                    } else {
+                        append(response, entry.mapping(), entry.adminOnly());
+                    }
+                });
         return truncate(response.toString());
     }
 
-    private static void append(StringBuilder response, CommandMapping mapping) {
+    private static void append(StringBuilder response, CommandMapping mapping, boolean adminOnly) {
         String arguments = mapping.arguments().values().stream()
                 .map(SlackCommandHelpFormatter::formatArgument)
                 .collect(Collectors.joining(" "));
-        append(response, mapping.name() + (arguments.isBlank() ? "" : " " + arguments),
-                mapping.description().isBlank() ? "No description provided." : mapping.description());
+        String command = mapping.name() + (arguments.isBlank() ? "" : " " + arguments);
         if (!mapping.aliases().isEmpty()) {
-            response.append(" (aliases: ")
-                    .append(String.join(", ", mapping.aliases()))
-                    .append(')');
+            command += " (aliases: " + String.join(", ", mapping.aliases()) + ")";
         }
-
+        append(response, command,
+                mapping.description().isBlank() ? "No description provided." : mapping.description(), adminOnly);
     }
 
     private static String formatArgument(CommandArgumentDefinition argument) {
@@ -47,8 +72,35 @@ public final class SlackCommandHelpFormatter {
         };
     }
 
-    private static void append(StringBuilder response, String command, String description) {
-        response.append("\n• /mc ").append(command).append(" — ").append(description);
+    private static void append(StringBuilder response, String command, String description, boolean adminOnly) {
+        response.append("\n• ");
+        if (adminOnly) {
+            response.append('*');
+        }
+        response.append("/mc ").append(command).append(" — ").append(description);
+        if (adminOnly) {
+            response.append('*');
+        }
+    }
+
+    private record HelpEntry(String command, String description, CommandMapping mapping, boolean adminOnly) {
+        private HelpEntry(String command, CommandMapping mapping) {
+            this(command, mapping.description().isBlank() ? "No description provided." : mapping.description(),
+                    mapping, false);
+        }
+
+        private HelpEntry(String command, CommandMapping mapping, boolean adminOnly) {
+            this(command, mapping.description().isBlank() ? "No description provided." : mapping.description(),
+                    mapping, adminOnly);
+        }
+
+        private HelpEntry(String command, String description) {
+            this(command, description, null, false);
+        }
+
+        private HelpEntry(String command, String description, boolean adminOnly) {
+            this(command, description, null, adminOnly);
+        }
     }
 
     private static String truncate(String response) {

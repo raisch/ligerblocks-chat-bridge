@@ -14,6 +14,7 @@ import com.ligerbots.ligerblockschatbridge.commands.SlackCommandAuthorizer;
 import com.ligerbots.ligerblockschatbridge.commands.SlackCommandHelpFormatter;
 import com.ligerbots.ligerblockschatbridge.commands.SlackCommandParser;
 import com.ligerbots.ligerblockschatbridge.commands.SlackCommandRequest;
+import com.ligerbots.ligerblockschatbridge.commands.CommandResponseMode;
 
 import java.io.IOException;
 import java.util.Map;
@@ -38,6 +39,10 @@ final class SlackSocketModeClient implements AutoCloseable {
             SlackInboundDispatcher dispatcher) throws java.io.IOException {
         this(botToken, appToken, channelId, dispatcher, null, request -> {
         }, request -> {
+        }, request -> {
+        }, request -> {
+        }, request -> {
+        }, request -> {
         });
     }
 
@@ -48,7 +53,11 @@ final class SlackSocketModeClient implements AutoCloseable {
             SlackInboundDispatcher dispatcher,
             CommandRegistryManager commandRegistry,
             Consumer<SlackCommandRequest> commandDispatcher,
-            Consumer<SlackCommandRequest> reloadDispatcher) throws java.io.IOException {
+            Consumer<SlackCommandRequest> reloadDispatcher,
+            Consumer<SlackCommandRequest> configDispatcher,
+            Consumer<SlackCommandRequest> adminDispatcher,
+            Consumer<SlackCommandRequest> eventsDispatcher,
+            Consumer<SlackCommandRequest> messagesDispatcher) throws java.io.IOException {
         App app = new App(AppConfig.builder()
                 .singleTeamBotToken(botToken)
                 .build());
@@ -87,6 +96,84 @@ final class SlackSocketModeClient implements AutoCloseable {
                 }
                 return context.ack(SlackCommandHelpFormatter.format(
                         commandRegistry.activeRegistry(), payload.getUserId()));
+            }
+            if ("config".equals(parsed.get().name())) {
+                if (commandRegistry == null || !commandRegistry.isLoaded()) {
+                    return context.ack("No Minecraft commands are configured.");
+                }
+                if (!commandRegistry.isAdministrator(payload.getUserId())) {
+                    LOGGER.info("Rejected unauthorized Slack /mc config from user {}", payload.getUserId());
+                    return context.ack("You are not authorized to view Minecraft commands.");
+                }
+                configDispatcher.accept(new SlackCommandRequest(
+                        payload.getChannelId(),
+                        payload.getUserId(),
+                        payload.getUserName(),
+                        payload.getResponseUrl(),
+                        "config",
+                        parsed.get().arguments()));
+                return context.ack("Minecraft command configuration requested.");
+            }
+            if ("admin".equals(parsed.get().name())) {
+                if (commandRegistry == null || !commandRegistry.isLoaded()) {
+                    return context.ack("No Minecraft commands are configured.");
+                }
+                if (!commandRegistry.isAdministrator(payload.getUserId())) {
+                    LOGGER.info("Rejected unauthorized Slack /mc admin command from user {}",
+                            payload.getUserId());
+                    return context.ack("You are not authorized to manage administrators.");
+                }
+                if (!isValidAdminArguments(parsed.get().arguments())) {
+                    return context.ack("Usage: /mc admin add SLACK_ID [-reload] [-list]");
+                }
+                adminDispatcher.accept(new SlackCommandRequest(
+                        payload.getChannelId(),
+                        payload.getUserId(),
+                        payload.getUserName(),
+                        payload.getResponseUrl(),
+                        "admin",
+                        parsed.get().arguments()));
+                return context.ack("Administrator update requested.");
+            }
+            if ("events".equals(parsed.get().name())) {
+                if (commandRegistry == null || !commandRegistry.isLoaded()) {
+                    return context.ack("No Minecraft commands are configured.");
+                }
+                if (!commandRegistry.isAdministrator(payload.getUserId())) {
+                    LOGGER.info("Rejected unauthorized Slack /mc events from user {}", payload.getUserId());
+                    return context.ack("You are not authorized to manage events.");
+                }
+                if (!isValidEventsArguments(parsed.get().arguments())) {
+                    return context.ack("Usage: /mc events [all|user|server] [on|off]");
+                }
+                eventsDispatcher.accept(new SlackCommandRequest(
+                        payload.getChannelId(),
+                        payload.getUserId(),
+                        payload.getUserName(),
+                        payload.getResponseUrl(),
+                        "events",
+                        parsed.get().arguments()));
+                return context.ack("Minecraft event setting update requested.");
+            }
+            if ("msgs".equals(parsed.get().name())) {
+                if (commandRegistry == null || !commandRegistry.isLoaded()) {
+                    return context.ack("No Minecraft commands are configured.");
+                }
+                if (!commandRegistry.isAdministrator(payload.getUserId())) {
+                    LOGGER.info("Rejected unauthorized Slack /mc msgs from user {}", payload.getUserId());
+                    return context.ack("You are not authorized to manage message relay.");
+                }
+                if (!isValidMessagesArguments(parsed.get().arguments())) {
+                    return context.ack("Usage: /mc msgs [from|to] [on|off]");
+                }
+                messagesDispatcher.accept(new SlackCommandRequest(
+                        payload.getChannelId(),
+                        payload.getUserId(),
+                        payload.getUserName(),
+                        payload.getResponseUrl(),
+                        "msgs",
+                        parsed.get().arguments()));
+                return context.ack("Minecraft message relay setting update requested.");
             }
             if (commandRegistry == null || !commandRegistry.isLoaded()) {
                 LOGGER.info("Rejected Slack /mc command from user {}: unknown or unconfigured command",
@@ -127,7 +214,8 @@ final class SlackSocketModeClient implements AutoCloseable {
                     payload.getUserName(),
                     payload.getResponseUrl(),
                     resolution.mapping().name(),
-                    parsed.get().arguments()));
+                    parsed.get().arguments(),
+                    resolution.mapping().responseMode()));
             LOGGER.info("Accepted Slack /mc command {} from user {}",
                     parsed.get().name(), payload.getUserId());
             return context.ack("Minecraft command accepted.");
@@ -136,6 +224,34 @@ final class SlackSocketModeClient implements AutoCloseable {
                 appToken,
                 com.slack.api.socket_mode.SocketModeClient.Backend.Tyrus,
                 app);
+    }
+
+    private static boolean isValidAdminArguments(java.util.List<String> arguments) {
+        if (arguments.isEmpty()) {
+            return false;
+        }
+        if ("list".equalsIgnoreCase(arguments.get(0))) {
+            return arguments.size() == 1;
+        }
+        if (!("add".equalsIgnoreCase(arguments.get(0)) || "del".equalsIgnoreCase(arguments.get(0)))
+                || arguments.size() < 2
+                || !arguments.get(1).matches("[UW][A-Z0-9]{8,20}")) {
+            return false;
+        }
+        return arguments.subList(2, arguments.size()).stream()
+                .allMatch(argument -> "-reload".equals(argument) || "-list".equals(argument));
+    }
+
+    private static boolean isValidEventsArguments(java.util.List<String> arguments) {
+        return arguments.size() == 2
+                && java.util.Set.of("all", "user", "server").contains(arguments.get(0).toLowerCase())
+                && java.util.Set.of("on", "off").contains(arguments.get(1).toLowerCase());
+    }
+
+    private static boolean isValidMessagesArguments(java.util.List<String> arguments) {
+        return arguments.size() == 2
+                && java.util.Set.of("from", "to").contains(arguments.get(0).toLowerCase())
+                && java.util.Set.of("on", "off").contains(arguments.get(1).toLowerCase());
     }
 
     private String resolveIdentity(MethodsClient slackClient, String userId) {

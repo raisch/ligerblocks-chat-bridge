@@ -20,11 +20,14 @@ import org.slf4j.Logger;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 import com.ligerbots.ligerblockschatbridge.commands.CommandConfigurationException;
 import com.ligerbots.ligerblockschatbridge.commands.CommandRegistry;
 import com.ligerbots.ligerblockschatbridge.commands.CommandRegistryLoader;
 import com.ligerbots.ligerblockschatbridge.commands.CommandRegistryManager;
+import com.ligerbots.ligerblockschatbridge.commands.CommandResponseMode;
 import com.ligerbots.ligerblockschatbridge.commands.MinecraftCommandExecutor;
 
 @Mod(LigerBlocksChatBridge.MOD_ID)
@@ -90,6 +93,7 @@ public class LigerBlocksChatBridge {
         }
 
         MinecraftServer server = event.getServer();
+        Path commandConfigPath = Path.of("config", "ligerblocks_chat_bridge-slack-commands.json");
         CommandRegistryManager commandRegistry = loadCommandRegistry();
         MinecraftCommandExecutor commandExecutor = commandRegistry == null
                 ? null
@@ -111,7 +115,11 @@ public class LigerBlocksChatBridge {
                             commandExecutor.execute(request);
                         }
                     },
-                    request -> reloadCommandRegistry(server, commandRegistry, request));
+                    request -> reloadCommandRegistry(server, commandRegistry, request),
+                    request -> sendCommandConfiguration(commandConfigPath, request),
+                    request -> updateAdministrators(server, commandRegistry, request),
+                    request -> updateEvents(server, request),
+                    request -> updateMessages(server, request));
             inboundClient.start();
         } catch (Exception | LinkageError failure) {
             inboundClient = null;
@@ -156,6 +164,97 @@ public class LigerBlocksChatBridge {
                 LOGGER.error("Slack command configuration reload failed: {}", failure.getMessage());
                 enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(
                         request, "Minecraft command configuration reload failed; previous configuration retained."));
+            }
+        });
+    }
+
+    private void sendCommandConfiguration(
+            Path configPath,
+            com.ligerbots.ligerblockschatbridge.commands.SlackCommandRequest request) {
+        try {
+            String configuration = Files.readString(configPath, StandardCharsets.UTF_8);
+            configuration = CommandRegistryLoader.withoutAdministrators(configuration);
+            enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(request, configuration));
+        } catch (IOException | CommandConfigurationException failure) {
+            LOGGER.error("Unable to read Slack command configuration for user {}: {}",
+                    request.userId(), failure.getMessage());
+            enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(
+                    request, "Unable to read the Minecraft command configuration."));
+        }
+    }
+
+    private void updateAdministrators(
+            MinecraftServer server,
+            CommandRegistryManager manager,
+            com.ligerbots.ligerblockschatbridge.commands.SlackCommandRequest request) {
+        server.execute(() -> {
+            try {
+                String action = request.arguments().get(0).toLowerCase(java.util.Locale.ROOT);
+                if ("list".equals(action)) {
+                    enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(
+                            request, "Administrators: " + manager.administrators()));
+                    return;
+                }
+                String userId = request.arguments().get(1);
+                String change = "add".equals(action)
+                        ? manager.addAdministrator(userId)
+                        : manager.removeAdministrator(userId);
+                boolean reload = request.arguments().contains("-reload");
+                boolean list = request.arguments().contains("-list");
+                if (reload) {
+                    manager.reload();
+                    change += " Command registry reloaded.";
+                }
+                if (list) {
+                    change += " Administrators: " + manager.administrators();
+                }
+                enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(request, change));
+            } catch (Exception failure) {
+                LOGGER.error("Slack administrator update failed: {}", failure.getMessage());
+                enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(
+                        request, "Administrator update failed: " + failure.getMessage()));
+            }
+        });
+    }
+
+    private void updateEvents(
+            MinecraftServer server,
+            com.ligerbots.ligerblockschatbridge.commands.SlackCommandRequest request) {
+        server.execute(() -> {
+            try {
+                String scope = request.arguments().get(0);
+                boolean enabled = "on".equalsIgnoreCase(request.arguments().get(1));
+                BridgeConfig.setEvents(scope, enabled);
+                enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(
+                        request,
+                        "Minecraft " + scope.toLowerCase(java.util.Locale.ROOT)
+                                + " events turned " + (enabled ? "on" : "off")
+                                + " (" + BridgeConfig.eventsStatus() + ")."));
+            } catch (RuntimeException failure) {
+                LOGGER.error("Slack event setting update failed: {}", failure.getMessage());
+                enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(
+                        request, "Event setting update failed: " + failure.getMessage()));
+            }
+        });
+    }
+
+    private void updateMessages(
+            MinecraftServer server,
+            com.ligerbots.ligerblockschatbridge.commands.SlackCommandRequest request) {
+        server.execute(() -> {
+            try {
+                String direction = request.arguments().get(0);
+                boolean enabled = "on".equalsIgnoreCase(request.arguments().get(1));
+                BridgeConfig.setMessages(direction, enabled);
+                enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(
+                        request,
+                        "Minecraft message relay " + direction.toLowerCase(java.util.Locale.ROOT)
+                                + " turned " + (enabled ? "on" : "off")
+                                + " (" + BridgeConfig.messagesStatus() + ")."));
+            } catch (RuntimeException failure) {
+                LOGGER.error("Slack message relay setting update failed: {}", failure.getMessage());
+                enqueueCommandResult(new MinecraftCommandExecutor.CommandExecutionResult(
+                        request, "Message relay setting update failed: " + failure.getMessage()));
             }
         });
     }
@@ -245,13 +344,20 @@ public class LigerBlocksChatBridge {
     private void enqueueCommandResult(MinecraftCommandExecutor.CommandExecutionResult result) {
         OutboundMessageQueue queue = outboundQueue;
         if (queue != null) {
-            String requester = result.request().userName();
-            if (requester == null || requester.isBlank()) {
-                requester = result.request().userId();
+            if (result.request().responseMode() == CommandResponseMode.CHANNEL) {
+                String requester = result.request().userName();
+                if (requester == null || requester.isBlank()) {
+                    requester = result.request().userId();
+                }
+                queue.enqueue(OutboundMessage.channel(
+                        result.request().channelId(),
+                        "[Slack] <" + requester + "> " + result.text()));
+            } else if (result.request().responseUrl() != null && !result.request().responseUrl().isBlank()) {
+                queue.enqueue(OutboundMessage.ephemeral(result.request().responseUrl(), result.text()));
+            } else {
+                LOGGER.warn("Dropping private Slack command result because response URL is unavailable for user {}",
+                        result.request().userId());
             }
-            queue.enqueue(new OutboundMessage(
-                    result.request().channelId(),
-                    "[Slack] <" + requester + "> " + result.text()));
         }
     }
 

@@ -13,7 +13,8 @@ public record CommandMapping(
         Set<String> roles,
         Map<String, CommandArgumentDefinition> arguments,
         Set<String> aliases,
-        String description) {
+        String description,
+        CommandResponseMode responseMode) {
     public CommandMapping(
             String name,
             List<String> minecraftCommands,
@@ -22,7 +23,21 @@ public record CommandMapping(
             Set<String> roles,
             Map<String, CommandArgumentDefinition> arguments,
             Set<String> aliases) {
-        this(name, minecraftCommands, permission, users, roles, arguments, aliases, "");
+        this(name, minecraftCommands, permission, users, roles, arguments, aliases, "",
+                CommandResponseMode.PRIVATE);
+    }
+
+    public CommandMapping(
+            String name,
+            List<String> minecraftCommands,
+            CommandPermission permission,
+            Set<String> users,
+            Set<String> roles,
+            Map<String, CommandArgumentDefinition> arguments,
+            Set<String> aliases,
+            String description) {
+        this(name, minecraftCommands, permission, users, roles, arguments, aliases, description,
+                CommandResponseMode.PRIVATE);
     }
 
     public CommandMapping {
@@ -32,6 +47,7 @@ public record CommandMapping(
         arguments = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(arguments));
         aliases = Set.copyOf(aliases);
         description = description == null ? "" : description.trim();
+        responseMode = responseMode == null ? CommandResponseMode.PRIVATE : responseMode;
     }
 
     public boolean isMacro() {

@@ -1,7 +1,10 @@
 package com.ligerbots.ligerblockschatbridge.commands;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class CommandRegistryManager {
@@ -44,6 +47,53 @@ public final class CommandRegistryManager {
 
     public boolean isLoaded() {
         return activeRegistry.get() != null;
+    }
+
+    public String addAdministrator(String userId) throws IOException, CommandConfigurationException {
+        CommandRegistry current = CommandRegistryLoader.load(path);
+        if (current.admins().contains(userId)) {
+            return "Slack user " + userId + " is already an administrator.";
+        }
+
+        String json = Files.readString(path, StandardCharsets.UTF_8);
+        Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
+        Files.writeString(
+                temporary,
+                JsonAdminsEditor.add(json, userId),
+                StandardCharsets.UTF_8);
+        try {
+            Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+            Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return "Added Slack user " + userId + " to administrators.";
+    }
+
+    public String administrators() throws IOException, CommandConfigurationException {
+        return String.join(", ", CommandRegistryLoader.load(path).admins());
+    }
+
+    public String removeAdministrator(String userId) throws IOException, CommandConfigurationException {
+        CommandRegistry current = CommandRegistryLoader.load(path);
+        if (!current.admins().contains(userId)) {
+            return "Slack user " + userId + " is not an administrator.";
+        }
+        if (current.admins().size() <= 1) {
+            throw new CommandConfigurationException("cannot remove the final administrator");
+        }
+
+        String json = Files.readString(path, StandardCharsets.UTF_8);
+        Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
+        Files.writeString(
+                temporary,
+                JsonAdminsEditor.remove(json, userId),
+                StandardCharsets.UTF_8);
+        try {
+            Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+            Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return "Removed Slack user " + userId + " from administrators.";
     }
 
     public boolean isAdministrator(String userId) {

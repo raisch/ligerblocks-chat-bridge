@@ -60,6 +60,26 @@ final class HttpSlackMessageClient implements SlackMessageClient {
         }
     }
 
+    @Override
+    public void sendEphemeralResponse(String responseUrl, String text)
+            throws IOException, InterruptedException {
+        String body = "{\"response_type\":\"ephemeral\",\"text\":\"" + escapeJson(text) + "\"}";
+        HttpRequest request = HttpRequest.newBuilder(URI.create(responseUrl))
+                .timeout(Duration.ofSeconds(20))
+                .header("Content-Type", "application/json; charset=utf-8")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() == 429) {
+            throw new SlackApiException("Slack response URL rate limit (HTTP 429)",
+                    parseRetryAfterMillis(response.headers().firstValue("Retry-After").orElse(null)));
+        }
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new SlackApiException("Slack response URL failed (status " + response.statusCode() + ")", 0);
+        }
+    }
+
     private static long parseRetryAfterMillis(String value) {
         if (value == null) {
             return 0;

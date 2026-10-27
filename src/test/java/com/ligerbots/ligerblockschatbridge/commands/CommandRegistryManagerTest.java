@@ -79,4 +79,75 @@ class CommandRegistryManagerTest {
             Files.deleteIfExists(path);
         }
     }
+
+    @Test
+    void addsAdministratorAtomicallyWithoutRemovingComments() throws Exception {
+        var path = Files.createTempFile("slack-commands", ".json");
+        try {
+            Files.writeString(path, """
+                    {
+                      // Keep this comment
+                      "admins": ["U123"],
+                      "commands": {
+                        "players": {"minecraft":"list","permission":"everyone"}
+                      }
+                    }
+                    """);
+            CommandRegistryManager manager = new CommandRegistryManager(path);
+
+            assertEquals("Added Slack user U456 to administrators.", manager.addAdministrator("U456"));
+            String updated = Files.readString(path);
+            assertEquals(true, updated.contains("// Keep this comment"));
+            assertEquals(true, CommandRegistryLoader.load(path).admins().contains("U456"));
+        } finally {
+            Files.deleteIfExists(path);
+            Files.deleteIfExists(path.resolveSibling(path.getFileName() + ".tmp"));
+        }
+    }
+
+    @Test
+    void removesAdministratorWithoutRemovingComments() throws Exception {
+        var path = Files.createTempFile("slack-commands", ".json");
+        try {
+            Files.writeString(path, """
+                    {
+                      // Keep this comment
+                      "admins": ["U123", "U456"],
+                      "commands": {
+                        "players": {"minecraft":"list","permission":"everyone"}
+                      }
+                    }
+                    """);
+            CommandRegistryManager manager = new CommandRegistryManager(path);
+
+            assertEquals("Removed Slack user U456 from administrators.",
+                    manager.removeAdministrator("U456"));
+            String updated = Files.readString(path);
+            assertEquals(true, updated.contains("// Keep this comment"));
+            assertEquals(false, CommandRegistryLoader.load(path).admins().contains("U456"));
+            assertEquals(true, CommandRegistryLoader.load(path).admins().contains("U123"));
+        } finally {
+            Files.deleteIfExists(path);
+            Files.deleteIfExists(path.resolveSibling(path.getFileName() + ".tmp"));
+        }
+    }
+
+    @Test
+    void refusesToRemoveTheFinalAdministrator() throws Exception {
+        var path = Files.createTempFile("slack-commands", ".json");
+        try {
+            Files.writeString(path, """
+                    {"admins":["U123"],"commands":{
+                      "players":{"minecraft":"list","permission":"everyone"}
+                    }}
+                    """);
+            CommandRegistryManager manager = new CommandRegistryManager(path);
+
+            assertThrows(CommandConfigurationException.class,
+                    () -> manager.removeAdministrator("U123"));
+        } finally {
+            Files.deleteIfExists(path);
+            Files.deleteIfExists(path.resolveSibling(path.getFileName() + ".tmp"));
+        }
+    }
 }

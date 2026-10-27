@@ -16,6 +16,56 @@ The bridge parses the Slack text without invoking a shell, validates the
 arguments, expands them into configured Minecraft command templates, and
 executes only the resulting allowlisted commands.
 
+The configuration loader accepts `//` single-line comments and `/* ... */`
+multiline comments. Comment markers inside quoted JSON strings are preserved.
+For example:
+
+```json
+{
+  // Administrators may reload this file
+  "admins": ["SLACK_USER_ID"],
+  "commands": {
+    "players": {
+      "minecraft": "list",
+      "permission": "everyone",
+      "description": "Show URLs such as https://example.test/a/*b*/ literally"
+    }
+  }
+}
+```
+
+Command results are sent as private ephemeral responses to the Slack user who
+invoked `/mc`. Minecraft chat, lifecycle events, and ordinary relay messages
+continue to use the configured shared channel.
+
+To intentionally publish a command result to the configured Slack channel, set
+the command's `response` property to `channel`:
+
+```json
+{
+  "announce": {
+    "minecraft": "say {message}",
+    "permission": "admin",
+    "response": "channel",
+    "arguments": {
+      "message": {
+        "type": "rest",
+        "required": true
+      }
+    }
+  }
+}
+```
+
+Invoke it with:
+
+```text
+/mc announce Server restart in five minutes
+```
+
+The result is posted publicly with the existing `[Slack] <user>` prefix.
+Commands without `response` remain private.
+
 ## Configuration structure
 
 The root object may contain an administrator list and must contain a `commands`
@@ -48,6 +98,7 @@ object:
 | `minecraft` | Yes | One Minecraft command string or an array of command strings. Do not include `/`. |
 | `permission` | Yes | `everyone`, `moderator`, or `admin`. |
 | `description` | No | Text shown by `/mc help`. |
+| `response` | No | `private` (default) or `channel`. Controls who sees command results. |
 | `aliases` | No | Additional command names. |
 | `users` | No | Legacy per-command Slack user IDs. |
 | `roles` | No | Slack role IDs used by the authorizer. |
@@ -85,20 +136,28 @@ Invocation:
 /mc players
 ```
 
-### One required argument
+### Whitelist subcommands
 
-Arguments are named in JSON and referenced in the Minecraft command with
-`{name}`:
+The whitelist mapping accepts `list`, `add`, or `del`, with an optional
+Minecraft username:
 
 ```json
 {
-  "addplayer": {
-    "minecraft": "whitelist add {player}",
+  "whitelist": {
+    "minecraft": "whitelist {action} {player}",
     "permission": "admin",
     "arguments": {
+      "action": {
+        "type": "option",
+        "options": ["list", "add", "del"]
+      },
       "player": {
         "type": "minecraft_username",
-        "required": true
+        "required": false,
+        "requiredWhen": {
+          "argument": "action",
+          "values": ["add", "del"]
+        }
       }
     }
   }
@@ -108,10 +167,14 @@ Arguments are named in JSON and referenced in the Minecraft command with
 Invocation:
 
 ```text
-/mc addplayer Steve
+/mc whitelist list
+/mc whitelist add Steve
+/mc whitelist del Steve
 ```
 
 Minecraft usernames must match `[A-Za-z0-9_]{3,16}`.
+The `requiredWhen` rule requires `player` for `add` and `del` while rejecting
+it for `list`.
 
 ### Optional single argument
 
@@ -376,8 +439,10 @@ commands. Authorization is checked against the resolved canonical command.
 ### `/mc help`
 
 Lists commands visible to the requesting Slack user. It includes descriptions,
-argument syntax, and aliases. Admin-only commands are hidden from users who
-cannot run them.
+argument syntax, and aliases. The complete visible list, including built-in
+commands, is sorted alphabetically. Admin-only commands are hidden from users
+who cannot run them. For administrators, admin-only commands are shown in
+bold; the first line of the response identifies this formatting.
 
 ### `/mc reload`
 
@@ -392,6 +457,104 @@ successful reload atomically replaces the active command registry. If the file
 is invalid, the previous valid registry remains active.
 
 The common TOML bridge configuration is not reloaded by `/mc reload`.
+
+### `/mc config`
+
+Administrators can request the command configuration privately:
+
+```text
+/mc config
+```
+
+The response contains the command configuration from
+`config/ligerblocks_chat_bridge-slack-commands.json`, including comments if
+present, but omits the top-level `admins` list. It is sent as a private
+ephemeral response and is not posted to the shared channel.
+
+### `/mc admin add`
+
+Administrators can add a Slack user ID to the top-level `admins` list:
+
+```text
+/mc admin add U012345678
+```
+
+Optional flags can reload the registry immediately and include the resulting
+administrator list:
+
+```text
+/mc admin add U012345678 -reload -list
+```
+
+The flags may be used independently. The command accepts Slack user IDs in the
+`U...` or `W...` format, writes the configuration atomically, and returns a
+private response to the invoking administrator.
+
+List administrators:
+
+```text
+/mc admin list
+```
+
+Remove an administrator:
+
+```text
+/mc admin del U012345678
+/mc admin del U012345678 -reload -list
+```
+
+The final administrator cannot be removed.
+
+### `/mc events`
+
+Administrators can change Minecraft event notifications while the server is
+running:
+
+```text
+/mc events all on
+/mc events all off
+/mc events user off
+/mc events server on
+```
+
+`user` controls player join, leave, death, and advancement notifications.
+`server` controls server-start and server-stop notifications. `all` changes
+both groups. The setting is runtime-only and does not change the TOML
+configuration file; it will return to the configured values after a restart.
+
+### `/mc msgs`
+
+Administrators can change message relay directions while the server is
+running:
+
+```text
+/mc msgs from on
+/mc msgs from off
+/mc msgs to on
+/mc msgs to off
+```
+
+`from` controls Minecraft chat and event messages sent to Slack. `to` controls
+ordinary Slack messages sent to Minecraft. The setting is runtime-only and
+returns to the configured values after a restart.
+
+## Command response delivery
+
+The slash-command acknowledgement is returned immediately, for example:
+
+```text
+Minecraft command accepted.
+```
+
+Once the command has run on the Minecraft server thread, the result is posted
+to Slack using the slash command's response URL with
+`"response_type": "ephemeral"`. Only the invoking user can see that result.
+This includes successful execution, invalid arguments discovered during
+execution, Minecraft command failures, and reload results.
+
+The response URL is used only for the command result and is not written to
+logs. If a response URL is unavailable, the bridge drops the result and logs a
+warning rather than posting a private command result to the shared channel.
 
 ## Test jig
 

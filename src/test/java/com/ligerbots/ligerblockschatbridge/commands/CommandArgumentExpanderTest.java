@@ -3,6 +3,7 @@ package com.ligerbots.ligerblockschatbridge.commands;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -90,9 +91,7 @@ class CommandArgumentExpanderTest {
                 CommandPermission.ADMIN,
                 Set.of(),
                 Set.of(),
-                Map.of(
-                        "words", new CommandArgumentDefinition("words", "one_or_more", true),
-                        "style", new CommandArgumentDefinition("style", "option", true, List.of("plain", "bold"))),
+                orderedDefinitions(),
                 Set.of());
 
         assertEquals(List.of("say hello brave world (bold)"),
@@ -111,5 +110,39 @@ class CommandArgumentExpanderTest {
                 Set.of());
 
         assertEquals(List.of("say "), CommandArgumentExpander.expand(mapping, List.of()));
+    }
+
+    @Test
+    void supportsConditionallyRequiredArguments() throws Exception {
+        Map<String, CommandArgumentDefinition> definitions = new LinkedHashMap<>();
+        definitions.put("action", new CommandArgumentDefinition(
+                "action", "option", true, List.of("list", "add", "del")));
+        definitions.put("player", new CommandArgumentDefinition(
+                "player", "minecraft_username", false, List.of(), "action", List.of("add", "del")));
+        CommandMapping mapping = new CommandMapping(
+                "whitelist",
+                List.of("whitelist {action} {player}"),
+                CommandPermission.ADMIN,
+                Set.of(),
+                Set.of(),
+                definitions,
+                Set.of());
+
+        assertEquals(List.of("whitelist list "),
+                CommandArgumentExpander.expand(mapping, List.of("list")));
+        assertEquals(List.of("whitelist add Steve"),
+                CommandArgumentExpander.expand(mapping, List.of("add", "Steve")));
+        assertThrows(CommandConfigurationException.class,
+                () -> CommandArgumentExpander.expand(mapping, List.of("add")));
+        assertThrows(CommandConfigurationException.class,
+                () -> CommandArgumentExpander.expand(mapping, List.of("list", "Steve")));
+    }
+
+    private static Map<String, CommandArgumentDefinition> orderedDefinitions() {
+        Map<String, CommandArgumentDefinition> definitions = new LinkedHashMap<>();
+        definitions.put("words", new CommandArgumentDefinition("words", "one_or_more", true));
+        definitions.put("style", new CommandArgumentDefinition(
+                "style", "option", true, List.of("plain", "bold")));
+        return definitions;
     }
 }

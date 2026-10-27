@@ -23,7 +23,7 @@ For example:
 ```json
 {
   // Administrators may reload this file
-  "admins": ["SLACK_USER_ID"],
+  "admins": ["SLACK_USERID"],
   "commands": {
     "players": {
       "minecraft": "list",
@@ -590,3 +590,49 @@ Invalid input is rejected before Minecraft execution. Typical failures include:
 Minecraft commands are never taken directly from Slack input. They must first
 be present as a configured `minecraft` template, and placeholders are expanded
 only from validated argument values.
+
+## Backus-Naur command grammar
+
+The following grammar describes the command text after the `/mc` slash-command
+prefix. Whitespace separates tokens. Square brackets in the explanatory text
+below are notation for optional alternatives; they are not entered literally.
+
+```bnf
+<slash-command> ::= "/mc" <whitespace> <command-name>
+                  | "/mc" <whitespace> <command-name> <whitespace> <arguments>
+
+<arguments> ::= <argument>
+              | <argument> <whitespace> <arguments>
+
+<argument> ::= <token>
+
+<token> ::= <token-part>
+          | <token-part> <token>
+
+<token-part> ::= <bare-character>
+               | <single-quoted-part>
+               | <double-quoted-part>
+               | "\" <character>
+
+<single-quoted-part> ::= "'" <single-quoted-characters> "'"
+<single-quoted-characters> ::= ""
+                              | <single-quoted-character> <single-quoted-characters>
+
+<double-quoted-part> ::= '"' <double-quoted-characters> '"'
+<double-quoted-characters> ::= ""
+                              | "\" <character> <double-quoted-characters>
+                              | <double-quoted-character> <double-quoted-characters>
+
+<bare-character> ::= any character except whitespace, "'", '"', or "\"
+<single-quoted-character> ::= any character except "'"
+<double-quoted-character> ::= any character except '"' or "\"
+<command-name> ::= <token>
+<whitespace> ::= one or more whitespace characters
+<character> ::= any character
+```
+
+Quoted sections are removed when tokens are produced, so
+`/mc announce "hello world"` supplies one argument containing `hello world`.
+Backslash escapes the following character outside single quotes and inside
+double quotes. An unterminated quote or trailing escape makes the input
+invalid. The command name is normalized to lowercase before command lookup.

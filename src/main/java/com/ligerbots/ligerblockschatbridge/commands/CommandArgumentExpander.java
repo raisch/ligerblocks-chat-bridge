@@ -93,7 +93,7 @@ public final class CommandArgumentExpander {
                 matcher.appendReplacement(expanded, Matcher.quoteReplacement(value));
             }
             matcher.appendTail(expanded);
-            commands.add(expanded.toString());
+            commands.add(expanded.toString().stripTrailing());
         }
         return List.copyOf(commands);
     }

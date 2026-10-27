@@ -109,7 +109,7 @@ class CommandArgumentExpanderTest {
                 Map.of("message", new CommandArgumentDefinition("message", "optional_one_or_more", false)),
                 Set.of());
 
-        assertEquals(List.of("say "), CommandArgumentExpander.expand(mapping, List.of()));
+        assertEquals(List.of("say"), CommandArgumentExpander.expand(mapping, List.of()));
     }
 
     @Test
@@ -128,7 +128,7 @@ class CommandArgumentExpanderTest {
                 definitions,
                 Set.of());
 
-        assertEquals(List.of("whitelist list "),
+        assertEquals(List.of("whitelist list"),
                 CommandArgumentExpander.expand(mapping, List.of("list")));
         assertEquals(List.of("whitelist add Steve"),
                 CommandArgumentExpander.expand(mapping, List.of("add", "Steve")));

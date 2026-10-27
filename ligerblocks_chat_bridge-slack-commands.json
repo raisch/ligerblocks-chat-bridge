@@ -1,32 +1,34 @@
-/*
- * ============================
- * Ligerblocks Chat Bridge Slack Commands Configuration
- * 
- * Install this file to the Minecraft server's configuration directory (/config)
- *
- * Configuration for Slack commands used by the Ligerblocks Chat Bridge
- * Defines the commands, permissions, and arguments for Slack integration with the Ligerblocks Chat Bridge
- *
- * Command format is defined in COMMANDS.md
- *
- * Example usage:
- *   /mc players
- *   /mc daytime
- *   /mc day
- *   /mc whitelist list
- *   /mc test-rest hello from Slack
- *
- */
 {
-  // Administrator Slack user IDs who have elevated permissions
+  /*
+   * ============================
+   * Ligerblocks Chat Bridge Slack Commands Configuration
+   * 
+   * Install this file to the Minecraft server's configuration directory (/config/ligerblocks_chat_bridge-slack-commands.json)
+   *
+   * Configuration for Slack commands used by the Ligerblocks Chat Bridge
+   * Defines the commands, permissions, and arguments for Slack integration with the Ligerblocks Chat Bridge
+   *
+   * Command format is defined in COMMANDS.md
+   *
+   * Example usage:
+   *   /mc players
+   *   /mc daytime
+   *   /mc day
+   *   /mc whitelist list
+   *   /mc test-rest hello from Slack
+   *
+   * Note: Replace "SLACK_USERID" with the actual Slack user IDs of the admins.
+   *
+   * Comments in this file are stripped out before being processed by the Ligerblocks Chat Bridge.
+   */
+
+  // Slack user IDs who have elevated permissions
   "admins": [
     "SLACK_USERID"
   ],
-  // Commands available via Slack
+
   "commands": {
-    /*
-      General commands available via Slack
-    */
+    // General commands (available to all)
     "players": {
       "minecraft": "list",
       "permission": "everyone",
@@ -42,9 +44,8 @@
       "description": "Show the current daytime",
       "response": "channel"
     },
-    /*
-      Admin commands available via Slack
-    */
+
+    // Admin commands (available to admins)
     "day": {
       "minecraft": "time set day",
       "permission": "admin",
@@ -92,9 +93,8 @@
         }
       }
     },
-    /*
-      Test commands available via Slack
-    */
+
+    // Test commands (available to admins) - these test various command argument shapes
     "test-rest": {
       "minecraft": "say {message}",
       "permission": "admin",

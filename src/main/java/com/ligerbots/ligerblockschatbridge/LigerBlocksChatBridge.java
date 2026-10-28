@@ -72,7 +72,10 @@ public class LigerBlocksChatBridge {
 
         outboundQueue = new OutboundMessageQueue(
                 BridgeConfig.QUEUE_CAPACITY.get(),
-                new HttpSlackMessageClient(botToken));
+                new HttpSlackMessageClient(
+                        botToken,
+                        BridgeConfig.SLACK_ICON_URL.get().trim(),
+                        BridgeConfig.SLACK_USERNAME.get().trim()));
         outboundQueue.start();
         LOGGER.info("Slack outbound relay started for configured channel");
         if (BridgeConfig.SYSTEM_EVENTS.get() && BridgeConfig.SERVER_START_NOTIFICATIONS.get()) {

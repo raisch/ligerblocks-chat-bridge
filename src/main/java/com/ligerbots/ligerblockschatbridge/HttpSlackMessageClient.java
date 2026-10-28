@@ -15,20 +15,28 @@ final class HttpSlackMessageClient implements SlackMessageClient {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final URI CHAT_POST_MESSAGE = URI.create("https://slack.com/api/chat.postMessage");
     private static final Pattern OK_RESPONSE = Pattern.compile("\"ok\"\\s*:\\s*true");
+    private static final Pattern ERROR_RESPONSE = Pattern.compile("\"error\"\\s*:\\s*\"([^\"]*)\"");
     private final HttpClient httpClient;
     private final String botToken;
+    private final String slackIconUrl;
+    private final String slackUsername;
 
-    HttpSlackMessageClient(String botToken) {
+    HttpSlackMessageClient(String botToken, String slackIconUrl, String slackUsername) {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         this.botToken = botToken;
+        this.slackIconUrl = slackIconUrl;
+        this.slackUsername = slackUsername;
     }
 
     @Override
     public void sendMessage(String channelId, String text) throws IOException, InterruptedException {
         String body = "{\"channel\":\"" + escapeJson(channelId) + "\",\"text\":\""
-                + escapeJson(text) + "\"}";
+                + escapeJson(text) + "\""
+                + (slackIconUrl.isBlank() ? "" : ",\"icon_url\":\"" + escapeJson(slackIconUrl) + "\"")
+                + (slackUsername.isBlank() ? "" : ",\"username\":\"" + escapeJson(slackUsername) + "\"")
+                + "}";
         HttpRequest request = HttpRequest.newBuilder(CHAT_POST_MESSAGE)
                 .timeout(Duration.ofSeconds(20))
                 .header("Authorization", "Bearer " + botToken)
@@ -54,9 +62,10 @@ final class HttpSlackMessageClient implements SlackMessageClient {
             throw new SlackApiException("Slack HTTP failure (status " + response.statusCode() + ")", 0);
         }
         if (!OK_RESPONSE.matcher(response.body()).find()) {
-            LOGGER.warn("Slack chat.postMessage returned an unsuccessful API response after {} ms",
-                    elapsedMillis);
-            throw new SlackApiException("Slack API rejected chat.postMessage response", 0);
+            String error = extractSlackError(response.body());
+            LOGGER.warn("Slack chat.postMessage returned an unsuccessful API response after {} ms: {}",
+                    elapsedMillis, error);
+            throw new SlackApiException("Slack API rejected chat.postMessage response: " + error, 0);
         }
     }
 
@@ -84,11 +93,17 @@ final class HttpSlackMessageClient implements SlackMessageClient {
         if (value == null) {
             return 0;
         }
+
         try {
             return Math.max(0, Long.parseLong(value.trim()) * 1_000);
         } catch (NumberFormatException ignored) {
             return 0;
         }
+    }
+
+    private static String extractSlackError(String body) {
+        var matcher = ERROR_RESPONSE.matcher(body);
+        return matcher.find() ? matcher.group(1) : "unknown Slack API error";
     }
 
     private static String escapeJson(String value) {

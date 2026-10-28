@@ -55,15 +55,12 @@ shutdown and server-stop notification test.
 
 ## Installation
 
-1. Run `./gradlew clean build`.
-2. Copy `build/libs/ligerblocks_chat_bridge-0.1.0.jar` to the dedicated
-   server's `mods/` directory.
-3. Start the server with Minecraft 1.21.1, NeoForge 21.1.256, and Java 21.
-4. Confirm the startup log reports `LigerBlocks Chat Bridge loaded` and reaches
-   the normal ready state.
+See [INSTALLATION.md](INSTALLATION.md) for comprehensive installation
+instructions, including Slack app setup, standalone server installation,
+Docker deployment, configuration, verification, upgrades, and troubleshooting.
 
-The metadata rejects incompatible Minecraft and NeoForge versions before the
-mod is loaded.
+The mod targets Minecraft 1.21.1, NeoForge 21.1.256, and Java 21. Its metadata
+rejects incompatible Minecraft and NeoForge versions before the mod is loaded.
 
 ## Docker deployment
 
@@ -120,6 +117,8 @@ The relay is disabled by default. Enable it in
 [relay]
 enabled = true
 channelId = "C0123456789"
+slackIconUrl = "https://ligerblocks.com/minecraft_slack_avatar_96x96.png"
+slackUsername = ""
 messageFormat = "<{player}> {message}"
 queueCapacity = 256
 joinNotifications = true
@@ -140,6 +139,9 @@ slackToMinecraft = true
 `slackToMinecraft` gates ordinary Slack messages delivered to Minecraft. These
 configuration switches are independent of the per-event notification settings
 and can be changed in the common config without changing command mappings.
+`slackIconUrl` is the HTTPS image URL used for outbound Slack message icons.
+`slackUsername` optionally sets the username used for outbound Slack messages;
+leave it blank to use Slack's default app identity.
 
 The channel ID is an ordinary configuration value. The Slack bot token must
 remain outside the configuration file and is loaded from one of these

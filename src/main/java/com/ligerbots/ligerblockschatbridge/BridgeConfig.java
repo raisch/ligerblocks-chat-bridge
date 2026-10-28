@@ -6,6 +6,8 @@ public final class BridgeConfig {
     public static final ModConfigSpec SPEC;
     public static final ModConfigSpec.BooleanValue ENABLED;
     public static final ModConfigSpec.ConfigValue<String> CHANNEL_ID;
+    public static final ModConfigSpec.ConfigValue<String> SLACK_ICON_URL;
+    public static final ModConfigSpec.ConfigValue<String> SLACK_USERNAME;
     public static final ModConfigSpec.ConfigValue<String> MESSAGE_FORMAT;
     public static final ModConfigSpec.IntValue QUEUE_CAPACITY;
     public static final ModConfigSpec.BooleanValue JOIN_NOTIFICATIONS;
@@ -28,6 +30,12 @@ public final class BridgeConfig {
         CHANNEL_ID = builder
                 .comment("Slack channel ID receiving Minecraft chat messages.")
                 .define("channelId", "");
+        SLACK_ICON_URL = builder
+                .comment("HTTPS image URL used as the Slack message icon.")
+                .define("slackIconUrl", "https://ligerblocks.com/minecraft_slack_avatar_96x96.png");
+        SLACK_USERNAME = builder
+                .comment("Optional Slack username used for outbound messages.")
+                .define("slackUsername", "");
         MESSAGE_FORMAT = builder
                 .comment("Outbound format. Supported placeholders: {player}, {message}.")
                 .define("messageFormat", "<{player}> {message}");

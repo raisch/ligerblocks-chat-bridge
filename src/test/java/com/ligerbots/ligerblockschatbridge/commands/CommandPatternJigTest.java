@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Exercises the command forms in the active development command configuration.
+ * Exercises the command forms in the supplied command configuration.
  * These cases can also be run manually through Slack after /mc reload.
  */
 class CommandPatternJigTest {
@@ -19,7 +19,7 @@ class CommandPatternJigTest {
     @BeforeAll
     static void loadJigConfiguration() throws Exception {
         registry = CommandRegistryLoader.load(Path.of(
-                "run/config/ligerblocks_chat_bridge-slack-commands.json"));
+                "config/ligerblocks_chat_bridge-slack-commands.json"));
     }
 
     @Test

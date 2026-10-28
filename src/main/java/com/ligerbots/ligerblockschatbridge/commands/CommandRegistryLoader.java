@@ -109,10 +109,17 @@ public final class CommandRegistryLoader {
         Set<String> aliases = normalizedNames(object, "aliases");
         String description = stringProperty(object, "description");
         CommandResponseMode responseMode = CommandResponseMode.parse(stringProperty(object, "response"));
+        Integer minecraftPermission = integerProperty(object, "minecraftPermission");
+        if (minecraftPermission != null && (minecraftPermission < 0 || minecraftPermission > 4)) {
+            throw new CommandConfigurationException(
+                    "minecraftPermission for command " + name + " must be between 0 and 4");
+        }
+        boolean broadcastAsSlack = booleanProperty(object, "broadcastAsSlack", false);
         Map<String, CommandArgumentDefinition> arguments = parseArguments(name, objectProperty(object, "arguments"));
         validatePlaceholders(name, minecraftCommands, arguments);
         return new CommandMapping(
-                name, minecraftCommands, permission, users, roles, arguments, aliases, description, responseMode);
+                name, minecraftCommands, permission, users, roles, arguments, aliases, description, responseMode,
+                minecraftPermission, broadcastAsSlack);
     }
 
     private static Map<String, CommandArgumentDefinition> parseArguments(String command, JsonObject arguments)
@@ -296,6 +303,22 @@ public final class CommandRegistryLoader {
     private static boolean booleanProperty(JsonObject object, String property, boolean defaultValue) {
         JsonElement value = object.get(property);
         return value == null || value.isJsonNull() ? defaultValue : value.getAsBoolean();
+    }
+
+    private static Integer integerProperty(JsonObject object, String property)
+            throws CommandConfigurationException {
+        JsonElement value = object.get(property);
+        if (value == null || value.isJsonNull()) {
+            return null;
+        }
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+            throw new CommandConfigurationException(property + " must be an integer");
+        }
+        try {
+            return value.getAsInt();
+        } catch (NumberFormatException invalid) {
+            throw new CommandConfigurationException(property + " must be an integer", invalid);
+        }
     }
 
     private static JsonObject objectProperty(JsonObject object, String property) {

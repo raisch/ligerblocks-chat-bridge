@@ -1,0 +1,19 @@
+{
+  "name": "ligerblocks-chat-bridge",
+  "version": "1.0.0",
+  "description": "A server-side NeoForge mod for bridging Minecraft chat and Slack. This repository contains the Milestone 2 outbound Minecraft-to-Slack implementation and the Milestone 3 Slack-to-Minecraft relay.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raisch/ligerblocks-chat-bridge.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/raisch/ligerblocks-chat-bridge/issues"
+  },
+  "homepage": "https://github.com/raisch/ligerblocks-chat-bridge#readme"
+}

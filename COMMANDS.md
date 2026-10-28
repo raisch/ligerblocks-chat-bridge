@@ -97,12 +97,38 @@ object:
 |---|---:|---|
 | `minecraft` | Yes | One Minecraft command string or an array of command strings. Do not include `/`. |
 | `permission` | Yes | `everyone`, `moderator`, or `admin`. |
+| `minecraftPermission` | No | Override the Minecraft command source permission level (`0` through `4`) without changing Slack authorization. |
+| `broadcastAsSlack` | No | Broadcast the expanded command as `[Slack] <username> message` instead of using the Minecraft command output. |
 | `description` | No | Text shown by `/mc help`. |
 | `response` | No | `private` (default) or `channel`. Controls who sees command results. |
 | `aliases` | No | Additional command names. |
 | `users` | No | Legacy per-command Slack user IDs. |
 | `roles` | No | Slack role IDs used by the authorizer. |
 | `arguments` | No | Ordered argument definitions. |
+
+`minecraftPermission` is useful when a command should be available to a
+specific Slack audience but the underlying Minecraft command requires a
+different permission level. For example, `/say` can remain available to all
+authorized Slack users while executing with Minecraft permission level 2:
+
+```json
+{
+  "say": {
+    "minecraft": "say {message}",
+    "permission": "everyone",
+    "minecraftPermission": 2,
+    "arguments": {
+      "message": {
+        "type": "rest",
+        "required": true
+      }
+    }
+  }
+}
+```
+
+The override must be an integer from `0` through `4`. If omitted, the
+Minecraft level is derived from `permission`.
 
 Multiple `minecraft` entries form a macro and execute in order:
 

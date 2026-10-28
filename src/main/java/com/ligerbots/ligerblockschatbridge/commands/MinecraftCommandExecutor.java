@@ -7,9 +7,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 public final class MinecraftCommandExecutor {
     private static final int MAX_OUTPUT_LENGTH = 2_000;
@@ -52,7 +55,13 @@ public final class MinecraftCommandExecutor {
             return;
         }
 
-        List<String> feedback = new ArrayList<>();
+        if (mapping.broadcastAsSlack()) {
+            broadcastAsSlack(request, commands);
+            publish(request, "Command completed (result 1)");
+            return;
+        }
+
+        List<String> feedback = Collections.synchronizedList(new ArrayList<>());
         CommandSource output = new CommandSource() {
             @Override
             public void sendSystemMessage(Component message) {
@@ -73,6 +82,7 @@ public final class MinecraftCommandExecutor {
             public boolean shouldInformAdmins() {
                 return false;
             }
+
         };
         CommandResult result = new CommandResult();
         CommandSourceStack source = server.createCommandSourceStack()
@@ -100,17 +110,46 @@ public final class MinecraftCommandExecutor {
             }
         }
 
+        if (commands.stream().anyMatch(command -> command.startsWith("spark "))) {
+            CompletableFuture.delayedExecutor(1, TimeUnit.SECONDS)
+                    .execute(() -> publishCommandResult(request, result, feedback));
+        } else {
+            publishCommandResult(request, result, feedback);
+        }
+    }
+
+    private void broadcastAsSlack(SlackCommandRequest request, List<String> commands) {
+        String identity = request.userName();
+        if (identity == null || identity.isBlank()) {
+            identity = request.userId();
+        }
+        String message = commands.getFirst();
+        int separator = message.indexOf(' ');
+        message = separator >= 0 ? message.substring(separator + 1) : "";
+        server.getPlayerList().broadcastSystemMessage(
+                Component.literal("[Slack] <" + identity + "> " + message), false);
+    }
+
+    private void publishCommandResult(
+            SlackCommandRequest request,
+            CommandResult result,
+            List<String> feedback) {
         String status = result.success ? "Command completed" : "Command failed";
         if (result.value != null) {
             status += " (result " + result.value + ")";
         }
-        if (!feedback.isEmpty()) {
-            status += ": " + String.join(" | ", feedback);
+        synchronized (feedback) {
+            if (!feedback.isEmpty()) {
+                status += ": " + String.join(" | ", feedback);
+            }
         }
         publish(request, truncate(status));
     }
 
     private static int permissionLevelFor(CommandMapping mapping) {
+        if (mapping.minecraftPermission() != null) {
+            return mapping.minecraftPermission();
+        }
         return switch (mapping.permission()) {
             case EVERYONE -> 0;
             case MODERATOR -> 2;
@@ -137,8 +176,8 @@ public final class MinecraftCommandExecutor {
     }
 
     private static final class CommandResult {
-        private boolean success;
-        private Integer value;
+        private volatile boolean success;
+        private volatile Integer value;
     }
 
     public record CommandExecutionResult(SlackCommandRequest request, String text) {

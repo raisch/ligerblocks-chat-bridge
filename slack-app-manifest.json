@@ -1,0 +1,46 @@
+{
+  "display_information": {
+    "name": "LigerBlocks Chat Bridge",
+    "description": "Bridges Minecraft chat and allowlisted Minecraft commands with Slack.",
+    "background_color": "#2D2A55"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "LigerBlocks Minecraft",
+      "always_online": false
+    },
+    "slash_commands": [
+      {
+        "command": "/mc",
+        "description": "Run an allowlisted Minecraft command",
+        "usage_hint": "players | help | whitelist list",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "chat:write.customize",
+        "channels:history",
+        "groups:history",
+        "users:read"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "bot_events": [
+        "message.channels",
+        "message.groups"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": false
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false
+  }
+}

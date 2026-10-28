@@ -21,6 +21,14 @@ class CommandRegistryLoaderTest {
                       "description": "Show online players",
                       "aliases": ["online"]
                     },
+                    "announce": {
+                      "minecraft": "say {message}",
+                      "permission": "everyone",
+                      "minecraftPermission": 2,
+                      "arguments": {
+                        "message": {"type": "rest", "required": true}
+                      }
+                    },
                     "morning": {
                       "minecraft": ["time set day", "weather clear"],
                       "permission": "moderator"
@@ -40,6 +48,7 @@ class CommandRegistryLoaderTest {
         assertEquals("Show online players", registry.find("players").orElseThrow().description());
         assertEquals(CommandResponseMode.PRIVATE, registry.find("players").orElseThrow().responseMode());
         assertEquals("players", registry.find("online").orElseThrow().name());
+        assertEquals(2, registry.find("announce").orElseThrow().minecraftPermission());
         assertEquals(2, registry.find("morning").orElseThrow().minecraftCommands().size());
         assertEquals("minecraft_username",
                 registry.find("addplayer").orElseThrow().arguments().get("player").type());
@@ -69,6 +78,11 @@ class CommandRegistryLoaderTest {
         assertThrows(CommandConfigurationException.class, () -> CommandRegistryLoader.parse("""
                 {"commands":{"players":{
                   "minecraft":"list","permission":"everyone","response":"broadcast"
+                }}}
+                """));
+        assertThrows(CommandConfigurationException.class, () -> CommandRegistryLoader.parse("""
+                {"commands":{"players":{
+                  "minecraft":"list","permission":"everyone","minecraftPermission":5
                 }}}
                 """));
     }

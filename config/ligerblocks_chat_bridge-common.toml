@@ -2,7 +2,7 @@
 #Enable outbound Minecraft chat relay to Slack.
 enabled = true
 #Slack channel ID receiving Minecraft chat messages.
-channelId = "SLACK_CHANNEL_ID"
+channelId = "C0CCN8YCUFL"
 #Slack Username - optional
 slackUsername = "Minecraft"
 #HTTPS image URL used as the Slack message icon. - optional

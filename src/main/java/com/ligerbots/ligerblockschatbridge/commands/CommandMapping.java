@@ -14,7 +14,9 @@ public record CommandMapping(
         Map<String, CommandArgumentDefinition> arguments,
         Set<String> aliases,
         String description,
-        CommandResponseMode responseMode) {
+        CommandResponseMode responseMode,
+        Integer minecraftPermission,
+        boolean broadcastAsSlack) {
     public CommandMapping(
             String name,
             List<String> minecraftCommands,
@@ -24,7 +26,7 @@ public record CommandMapping(
             Map<String, CommandArgumentDefinition> arguments,
             Set<String> aliases) {
         this(name, minecraftCommands, permission, users, roles, arguments, aliases, "",
-                CommandResponseMode.PRIVATE);
+                CommandResponseMode.PRIVATE, null, false);
     }
 
     public CommandMapping(
@@ -37,7 +39,7 @@ public record CommandMapping(
             Set<String> aliases,
             String description) {
         this(name, minecraftCommands, permission, users, roles, arguments, aliases, description,
-                CommandResponseMode.PRIVATE);
+                CommandResponseMode.PRIVATE, null, false);
     }
 
     public CommandMapping {
@@ -48,6 +50,9 @@ public record CommandMapping(
         aliases = Set.copyOf(aliases);
         description = description == null ? "" : description.trim();
         responseMode = responseMode == null ? CommandResponseMode.PRIVATE : responseMode;
+        if (minecraftPermission != null && (minecraftPermission < 0 || minecraftPermission > 4)) {
+            throw new IllegalArgumentException("minecraftPermission must be between 0 and 4");
+        }
     }
 
     public boolean isMacro() {

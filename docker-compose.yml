@@ -2,7 +2,7 @@ services:
   minecraft:
     image: itzg/minecraft-server:java21
     container_name: ligerblocks-minecraft
-    restart: unless-stopped
+    # restart: unless-stopped
     ports:
       - "25565:25565"
     environment:
@@ -20,7 +20,8 @@ services:
       - slack_app_token
     volumes:
       - minecraft-data:/data
-      - ./build/libs/ligerblocks_chat_bridge-0.1.0.jar:/data/mods/ligerblocks_chat_bridge-0.1.0.jar:ro
+      - ./mods:/data/mods:ro
+      - ./config:/config:ro
 
 volumes:
   minecraft-data:

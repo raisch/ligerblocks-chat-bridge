@@ -21,12 +21,10 @@
    *
    * Comments in this file are stripped out before being processed by the Ligerblocks Chat Bridge.
    */
-
   // Slack user IDs who have elevated permissions
   "admins": [
-    "SLACK_USERID"
+    "U03UD1M20"
   ],
-
   "commands": {
     // General commands (available to all)
     "players": {
@@ -38,33 +36,96 @@
       ],
       "response": "channel"
     },
-    "daytime": {
-      "minecraft": "time query daytime",
+    "tps": {
+      "minecraft": "spark tps",
       "permission": "everyone",
-      "description": "Show the current daytime",
+      "description": "Show the server ticks per second",
       "response": "channel"
     },
-
+    "get-time": {
+      "minecraft": "time query {query}",
+      "permission": "everyone",
+      "description": "Query the Minecraft time",
+      "response": "channel",
+      "arguments": {
+        "query": {
+          "type": "option",
+          "required": true,
+          "options": [
+            "day",
+            "daytime",
+            "gametime"
+          ]
+        }
+      }
+    },
+    "tell": {
+      "minecraft": "tell {player} {message}",
+      "permission": "everyone",
+      "description": "Send a private message to a Minecraft player",
+      "arguments": {
+        "player": {
+          "type": "minecraft_username",
+          "required": true
+        },
+        "message": {
+          "type": "rest",
+          "required": true
+        }
+      }
+    },
+    "say": {
+      "minecraft": "say {message}",
+      "permission": "everyone",
+      "minecraftPermission": 2,
+      "broadcastAsSlack": true,
+      "description": "Send a message to all players in the Minecraft server",
+      "arguments": {
+        "message": {
+          "type": "rest",
+          "required": true
+        }
+      }
+    },
     // Admin commands (available to admins)
-    "day": {
-      "minecraft": "time set day",
+    "set-time": {
+      "minecraft": "time set {period}",
       "permission": "admin",
-      "description": "Set the world time to day"
+      "description": "Set the world time",
+      "arguments": {
+        "period": {
+          "type": "option",
+          "required": true,
+          "options": [
+            "day",
+            "noon",
+            "night",
+            "midnight"
+          ]
+        }
+      }
     },
-    "noon": {
-      "minecraft": "time set noon",
+    "op": {
+      "minecraft": "op {player}",
       "permission": "admin",
-      "description": "Set the world time to noon"
+      "description": "Grant a Minecraft player operator status",
+      "arguments": {
+        "player": {
+          "type": "minecraft_username",
+          "required": true
+        }
+      }
     },
-    "night": {
-      "minecraft": "time set night",
+    "deop": {
+      "minecraft": "deop {player}",
       "permission": "admin",
-      "description": "Set the world time to night"
-    },
-    "midnight": {
-      "minecraft": "time set midnight",
-      "permission": "admin",
-      "description": "Set the world time to midnight"
+      "description": "Remove operator status from a Minecraft player",
+      "arguments": {
+        "player": {
+          "type": "minecraft_username",
+          "required": true
+        }
+      }
     },
     "whitelist": {
       "minecraft": "whitelist {action} {player}",
@@ -90,76 +151,6 @@
               "del"
             ]
           }
-        }
-      }
-    },
-
-    // Test commands (available to admins) - these test various command argument shapes
-    "test-rest": {
-      "minecraft": "say {message}",
-      "permission": "admin",
-      "description": "Test a rest argument: /mc test-rest hello from Slack",
-      "arguments": {
-        "message": {
-          "type": "rest",
-          "required": true
-        }
-      }
-    },
-    "test-required-many": {
-      "minecraft": "say required={words}",
-      "permission": "admin",
-      "description": "Test one or more required arguments",
-      "arguments": {
-        "words": {
-          "type": "one_or_more",
-          "required": true
-        }
-      }
-    },
-    "test-optional-many": {
-      "minecraft": "say optional={words}",
-      "permission": "admin",
-      "description": "Test zero or more optional arguments",
-      "arguments": {
-        "words": {
-          "type": "optional_one_or_more",
-          "required": false
-        }
-      }
-    },
-    "test-option": {
-      "minecraft": "weather {weather}",
-      "permission": "admin",
-      "description": "Test a constrained option",
-      "arguments": {
-        "weather": {
-          "type": "option",
-          "required": true,
-          "options": [
-            "clear",
-            "rain",
-            "thunder"
-          ]
-        }
-      }
-    },
-    "test-many-option": {
-      "minecraft": "say words={words} style={style}",
-      "permission": "admin",
-      "description": "Test required arguments followed by an option",
-      "arguments": {
-        "words": {
-          "type": "one_or_more",
-          "required": true
-        },
-        "style": {
-          "type": "option",
-          "required": true,
-          "options": [
-            "plain",
-            "bold"
-          ]
         }
       }
     }

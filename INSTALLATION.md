@@ -149,30 +149,49 @@ server's mod list. Do not copy the bridge JAR directly into the live
 `mods/` directory and then run Packwiz, because a later pack update can remove
 files that are not recorded in `index.toml`.
 
-The bridge JAR must be available to Packwiz as a published artifact. A local
-filesystem path on the developer's machine is not available to the server or
-to other pack users. Publish the JAR at a stable HTTPS URL, such as a release
-asset or an internal artifact repository:
+Build the mod from the repository root:
 
 ```text
-https://downloads.example.com/ligerblocks_chat_bridge-0.1.0.jar
+./gradlew clean build
 ```
 
-From the Packwiz pack directory, add the artifact using the URL workflow:
+Packwiz does not automatically add an arbitrary local JAR when it runs
+`packwiz refresh`. The `.pw.toml` files in `mods/` are metadata entries, and a
+Packwiz-managed entry requires a download source. Therefore, a local JAR
+cannot be distributed through the normal Packwiz metadata workflow without
+making it available at a URL.
+
+For a fully Packwiz-managed installation, publish the JAR to a private or
+public HTTPS artifact location and add it with:
 
 ```sh
 packwiz url add https://downloads.example.com/ligerblocks_chat_bridge-0.1.0.jar
 packwiz refresh
 ```
 
-When Packwiz prompts for metadata, use the bridge's Minecraft and NeoForge
-versions and mark the mod as **server-side**. The resulting `.pw.toml` entry
-must remain in the pack repository and must be committed along with the
-updated `index.toml`. Use the same Packwiz command and metadata conventions
-already used by the pack for other custom JARs.
+The URL does not need to be public, but it must be reachable by the Packwiz
+installer running on the server. An internal artifact server or a
+pack-hosting service can be used instead of a public download site. Mark the
+generated entry as **server-side** because the bridge is not required on
+clients. Commit the generated `.pw.toml` file and updated `index.toml`.
+
+If publishing an artifact is not possible, install the bridge outside Packwiz
+as a local server-only file after Packwiz finishes installing the rest of the
+pack:
+
+```sh
+packwiz refresh
+cp /path/to/ligerblocks-chat-bridge/build/libs/ligerblocks_chat_bridge-0.1.0.jar /path/to/server/mods/
+```
+
+In this arrangement, the bridge JAR is intentionally not shown by
+`packwiz list` and is not tracked by Packwiz. Your server update procedure must
+copy the JAR again after every build or deployment. Keep the JAR outside the
+Packwiz pack repository if the pack's update process replaces the entire
+`mods/` directory.
 
 If the bridge is published to Modrinth or CurseForge, prefer the corresponding
-Packwiz platform command instead of a raw URL:
+Packwiz platform command instead:
 
 ```sh
 packwiz modrinth add <project-id-or-slug>
@@ -208,16 +227,21 @@ cp config/ligerblocks_chat_bridge-common.toml /path/to/server/config/
 cp config/ligerblocks_chat_bridge-slack-commands.json /path/to/server/config/
 ```
 
-For a custom build update:
+For a custom local build update with a URL-backed Packwiz entry:
 
 1. Run `./gradlew clean build`.
-2. Publish the new JAR at a new or updated HTTPS artifact URL.
-3. Update the Packwiz `.pw.toml` metadata and checksum if the URL or version
-   changed.
-4. Run `packwiz refresh`.
-5. Commit the Packwiz metadata and `index.toml`.
-6. Apply the updated pack to the server.
-7. Verify the server log reports `LigerBlocks Chat Bridge loaded`.
+2. Publish the new JAR at the artifact URL.
+3. Update the Packwiz entry and run `packwiz refresh`.
+4. Commit the `.pw.toml` metadata and `index.toml`.
+5. Apply the updated pack to the server.
+6. Verify the server log reports `LigerBlocks Chat Bridge loaded`.
+
+For a local side-loaded update, replace the JAR directly in the server's
+`mods/` directory after Packwiz finishes:
+
+```sh
+cp /path/to/ligerblocks-chat-bridge/build/libs/ligerblocks_chat_bridge-0.1.0.jar /path/to/server/mods/
+```
 
 Keep the previous JAR available for rollback. Do not delete the server's
 world or configuration while rolling back a mod.
@@ -313,7 +337,8 @@ token files outside the Packwiz repository and outside source control.
 
 The repository includes a Docker Compose deployment using
 `itzg/minecraft-server:java21`. It persists the server in the named
-`minecraft-data` volume and mounts the built JAR into `/data/mods`.
+`minecraft-data` volume and mounts the repository's `mods/` directory into
+`/data/mods`.
 
 Create token files outside source control:
 
@@ -328,11 +353,33 @@ Build and start the server:
 
 ```sh
 ./gradlew clean build
+mkdir -p mods
+cp build/libs/ligerblocks_chat_bridge-0.1.0.jar mods/
 docker compose up -d
 docker compose logs -f minecraft
 ```
 
+The Compose file bind-mounts `./mods` to `/data/mods` as read-only. Add every
+server mod that should be loaded to the repository's `mods/` directory before
+starting or recreating the container. The bridge JAR is therefore loaded from:
+
+```text
+./mods/ligerblocks_chat_bridge-0.1.0.jar
+→ /data/mods/ligerblocks_chat_bridge-0.1.0.jar
+```
+
+When updating the bridge or another server mod:
+
+```sh
+./gradlew clean build
+cp build/libs/ligerblocks_chat_bridge-0.1.0.jar mods/
+docker compose up -d --force-recreate minecraft
+```
+
 On first startup, the container creates its configuration under `/data/config`.
+The Compose file mounts the repository's `config/` directory at `/config`.
+The image init process copies those files into the writable `/data/config`
+directory, so NeoForge can create and update files such as `fml.toml`.
 The repository's top-level `config/` directory is not mounted into the
 container.
 After the first startup, copy the configuration files into the persistent
@@ -441,10 +488,11 @@ Build the new artifact and stop the server before replacing the old JAR:
 
 For a standalone server, replace the JAR in `mods/` and start the server.
 
-For Docker, the JAR is bind-mounted from `build/libs`, so recreate the
-container after building:
+For Docker, copy the new JAR into the bind-mounted `mods/` directory, then
+recreate the container:
 
 ```sh
+cp build/libs/ligerblocks_chat_bridge-0.1.0.jar mods/
 docker compose up -d --force-recreate minecraft
 ```
 

@@ -75,6 +75,7 @@ tasks.register('slackApiClientRuntimeJar', Jar) {
             .filter { it.name.startsWith('slack-api-client-') || it.name.startsWith('slack-api-model-') }
             .collect { zipTree(it) }) {
         exclude('META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA')
+        exclude('kotlin/**')
         exclude('com/google/gson/**', 'com/google/errorprone/**',
                 'org/apache/commons/lang3/**', 'org/slf4j/**')
     }
@@ -147,6 +148,7 @@ tasks.named('jar', Jar) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(configurations.slackEmbed.collect { zipTree(it) }) {
         exclude('META-INF/MANIFEST.MF', 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA')
+        exclude('kotlin/**')
         exclude('com/google/gson/**', 'com/google/errorprone/**',
                 'org/apache/commons/lang3/**', 'org/slf4j/**')
     }
@@ -172,6 +174,8 @@ tasks.register('verifyModJar') {
                     'Embedded Slack model classes are missing'
             assert archive.getEntry('com/google/gson/Gson.class') == null:
                     'Gson classes must be provided by NeoForge, not embedded in the mod'
+            assert archive.getEntry('kotlin/coroutines/Continuation.class') == null:
+                    'Kotlin classes must be provided by the modpack, not embedded in the mod'
             assert archive.getEntry('com/google/errorprone/annotations/CheckReturnValue.class') == null:
                     'Error Prone annotations must be provided by NeoForge, not embedded in the mod'
             assert archive.getEntry('org/apache/commons/lang3/StringUtils.class') == null:

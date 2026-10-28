@@ -14,7 +14,7 @@ class SlackInboundDispatcherTest {
         List<Runnable> scheduled = new ArrayList<>();
         List<String> broadcasts = new ArrayList<>();
         SlackInboundDispatcher dispatcher = new SlackInboundDispatcher(
-                "C123", scheduled::add, broadcasts::add);
+                "C123", scheduled::add, broadcasts::add, () -> true);
 
         dispatcher.dispatch(new InboundSlackMessage("C123", "hello", "U123"));
 
@@ -29,9 +29,21 @@ class SlackInboundDispatcherTest {
         List<Runnable> scheduled = new ArrayList<>();
         SlackInboundDispatcher dispatcher = new SlackInboundDispatcher(
                 "C123", scheduled::add, ignored -> {
-                });
+                }, () -> true);
 
         dispatcher.dispatch(new InboundSlackMessage("C999", "hello", "U123"));
+
+        assertTrue(scheduled.isEmpty());
+    }
+
+    @Test
+    void doesNotScheduleWhenInboundRelayIsDisabled() {
+        List<Runnable> scheduled = new ArrayList<>();
+        SlackInboundDispatcher dispatcher = new SlackInboundDispatcher(
+                "C123", scheduled::add, ignored -> {
+                }, () -> false);
+
+        dispatcher.dispatch(new InboundSlackMessage("C123", "hello", "U123"));
 
         assertTrue(scheduled.isEmpty());
     }

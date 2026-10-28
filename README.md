@@ -55,15 +55,12 @@ shutdown and server-stop notification test.
 
 ## Installation
 
-1. Run `./gradlew clean build`.
-2. Copy `build/libs/ligerblocks_chat_bridge-0.1.0.jar` to the dedicated
-   server's `mods/` directory.
-3. Start the server with Minecraft 1.21.1, NeoForge 21.1.256, and Java 21.
-4. Confirm the startup log reports `LigerBlocks Chat Bridge loaded` and reaches
-   the normal ready state.
+See [INSTALLATION.md](INSTALLATION.md) for comprehensive installation
+instructions, including Slack app setup, standalone server installation,
+Docker deployment, configuration, verification, upgrades, and troubleshooting.
 
-The metadata rejects incompatible Minecraft and NeoForge versions before the
-mod is loaded.
+The mod targets Minecraft 1.21.1, NeoForge 21.1.256, and Java 21. Its metadata
+rejects incompatible Minecraft and NeoForge versions before the mod is loaded.
 
 ## Docker deployment
 
@@ -120,6 +117,8 @@ The relay is disabled by default. Enable it in
 [relay]
 enabled = true
 channelId = "C0123456789"
+slackIconUrl = "https://ligerblocks.com/minecraft_slack_avatar_96x96.png"
+slackUsername = ""
 messageFormat = "<{player}> {message}"
 queueCapacity = 256
 joinNotifications = true
@@ -128,7 +127,21 @@ deathNotifications = true
 advancementNotifications = true
 serverStartNotifications = true
 serverStopNotifications = true
+userEvents = true
+systemEvents = true
+minecraftToSlack = true
+slackToMinecraft = true
 ```
+
+`userEvents` controls player join, leave, death, and advancement notifications.
+`systemEvents` controls server-start and server-stop notifications.
+`minecraftToSlack` gates all Minecraft chat and event delivery to Slack.
+`slackToMinecraft` gates ordinary Slack messages delivered to Minecraft. These
+configuration switches are independent of the per-event notification settings
+and can be changed in the common config without changing command mappings.
+`slackIconUrl` is the HTTPS image URL used for outbound Slack message icons.
+`slackUsername` optionally sets the username used for outbound Slack messages;
+leave it blank to use Slack's default app identity.
 
 The channel ID is an ordinary configuration value. The Slack bot token must
 remain outside the configuration file and is loaded from one of these
@@ -184,6 +197,167 @@ with the failure details. HTTP 429 responses honor the `Retry-After` delay,
 capped at 60 seconds. Transient delivery failures use at most three attempts
 with bounded exponential backoff. Server shutdown stops the sender and clears
 queued messages after the final shutdown notification is attempted.
+
+## Slack `/mc` command executor
+
+The bridge supports a native Slack `/mc` slash command over the existing Socket
+Mode connection. No Request URL or second WebSocket is required.
+
+Configure commands in the Minecraft server's
+`config/ligerblocks_chat_bridge-slack-commands.json` file. The bundled defaults
+provide:
+
+See [COMMANDS.md](COMMANDS.md) for the complete parser reference, JSON schema,
+argument forms, validation rules, and examples.
+
+```text
+/mc players
+/mc daytime
+/mc whitelist list
+/mc whitelist add Steve
+```
+
+The loader accepts `//` single-line comments and `/* ... */` multiline
+comments. Comment markers inside quoted strings are preserved.
+
+Admin mappings use the top-level `admins` list. Display names and Minecraft
+usernames are not authorization identities:
+
+```json
+{
+  "admins": ["U0123456789"],
+  "commands": {
+    "whitelist": {
+      "minecraft": "whitelist {action} {player}",
+      "permission": "admin",
+      "description": "List, add, or remove whitelisted players",
+      "arguments": {
+        "action": {
+          "type": "option",
+          "options": ["list", "add", "del"]
+        },
+        "player": {
+          "type": "minecraft_username",
+          "required": false,
+          "requiredWhen": {
+            "argument": "action",
+            "values": ["add", "del"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+To configure the Slack command:
+
+1. Open <https://api.slack.com/apps> and select the bridge app.
+2. Open **Features → Slash Commands** and choose **Create New Command**.
+3. Set the command to `/mc` and describe it as `Run an allowlisted Minecraft command`.
+4. Leave **Request URL** unset because Socket Mode is already enabled.
+5. Save the command and reinstall the app if Slack requests it.
+6. Confirm the bot is a member of the configured channel.
+
+The command configuration is loaded during server startup. An administrator
+listed in the top-level `admins` list can reload an external configuration
+without restarting Minecraft:
+
+```text
+/mc reload
+```
+
+Reload parses and validates the complete replacement before publishing it. A
+failed reload leaves the previous valid registry active. The bundled defaults
+are used when the external file does not exist; `/mc reload` requires an
+external configuration file.
+
+Use the built-in help command to list the mappings available to the requesting
+Slack user:
+
+```text
+/mc help
+```
+
+Help includes each mapping's `description`, argument placeholders, and aliases.
+The complete visible command list is sorted alphabetically. Admin-only mappings
+and built-in administrator commands are omitted for non-admin users. For
+administrators, those commands are shown in bold, and the first line explains
+the formatting. The `help` command itself does not execute a Minecraft command.
+
+Built-in commands include:
+
+```text
+/mc help
+/mc reload
+/mc config
+/mc admin add SLACK_ID [-reload] [-list]
+/mc admin list
+/mc admin del SLACK_ID [-reload] [-list]
+/mc events [all|user|server] [on|off]
+/mc msgs [from|to] [on|off]
+```
+
+`/mc config` returns the command JSON privately, excluding the top-level
+`admins` list. `/mc admin add`, `/mc admin list`, and `/mc admin del` manage
+administrator IDs. The final administrator cannot be removed.
+
+By default, command results are private ephemeral responses visible only to the
+invoking user. A command can explicitly publish its result to the configured
+channel with:
+
+```json
+"response": "channel"
+```
+
+The default is:
+
+```json
+"response": "private"
+```
+
+Command names and aliases support unique prefixes. For example, `/mc ni`
+resolves to `night` when it is the only matching command. Ambiguous prefixes
+such as `/mc n` when both `night` and `noon` exist are rejected with the
+matching command names. Exact command and alias matches always take precedence,
+and authorization is checked against the resolved canonical command.
+
+Recommended Slack test sequence:
+
+```text
+/mc players
+/mc daytime
+/mc whitelist list
+/mc whitelist add Steve
+/mc whitelist del Steve
+/mc unknown
+/mc whitelist add
+/mc whitelist add "not a valid username"
+/mc help
+/mc reload
+/mc config
+/mc admin list
+/mc events user off
+```
+
+Verify that successful commands return bounded Minecraft feedback, invalid or
+unknown commands are rejected without execution, unauthorized users cannot run
+admin mappings, and reload failures report that the previous configuration was
+retained. Test `/mc` from a non-configured channel and confirm it is rejected.
+After editing the mapping file, run `/mc reload` and verify a newly added
+mapping works without restarting the server.
+
+The `/mc events` command changes user and server event notification switches
+at runtime. These changes are not persisted to the TOML configuration and
+return to the configured values after a server restart.
+
+The `/mc msgs` command controls message relay directions at runtime:
+
+- `from` enables or disables Minecraft chat and event messages sent to Slack.
+- `to` enables or disables ordinary Slack messages sent to Minecraft.
+
+These changes are not persisted to the TOML configuration and return to the
+configured values after a server restart.
 
 Server and player lifecycle notifications use the same outbound queue:
 

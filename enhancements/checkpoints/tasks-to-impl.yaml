@@ -1,0 +1,151 @@
+metadata:
+  generated: "2026-10-27"
+  source_tasks: "enhancements/command-executor-plan.md"
+  last_updated: "2026-10-27"
+summary:
+  total_tasks: 27
+  completed_tasks: 23
+  in_progress_tasks: 0
+  pending_tasks: 4
+  completion_percentage: 85.2
+tasks:
+  - task_id: "T012"
+    description: "Implement command tokenization, typed argument validation, placeholder expansion, aliases, and macro expansion."
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "src/main/java/com/ligerbots/ligerblockschatbridge/commands/CommandArgumentExpander.java"
+          changes:
+            - change_type: "added"
+              description: "Added bounded argument validation and expansion."
+    verification:
+      build_passed: true
+      test_results:
+        command: "./gradlew clean build"
+        passed: 19
+        failed: 0
+        skipped: 0
+        failures: []
+    upstream_trace:
+      plan_item: "3.1"
+      requirements: ["REQ-004", "REQ-008"]
+      full_trace: "REQ-004,REQ-008 -> Phase-3.1 -> T012 -> CommandArgumentExpander.java"
+  - task_id: "T013"
+    description: "Add argument expansion and tokenizer tests."
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "src/test/java/com/ligerbots/ligerblockschatbridge/commands/CommandArgumentExpanderTest.java"
+          changes:
+            - change_type: "added"
+              description: "Added valid, missing, extra, malformed, and macro tests."
+    verification:
+      build_passed: true
+      test_results:
+        command: "./gradlew clean build"
+        passed: 19
+        failed: 0
+        skipped: 0
+        failures: []
+    upstream_trace:
+      plan_item: "3.1"
+      requirements: ["REQ-004", "REQ-008", "REQ-010"]
+      full_trace: "REQ-004,REQ-008,REQ-010 -> Phase-3.1 -> T013 -> command tests"
+  - task_id: "T014"
+    description: "Execute mapped commands through Brigadier on the server thread."
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "src/main/java/com/ligerbots/ligerblockschatbridge/commands/MinecraftCommandExecutor.java"
+          changes:
+            - change_type: "added"
+              description: "Added MinecraftServer.execute dispatch and Brigadier execution."
+    verification:
+      build_passed: true
+      test_results:
+        command: "./gradlew clean build"
+        passed: 19
+        failed: 0
+        skipped: 0
+        failures: []
+    upstream_trace:
+      plan_item: "3.2"
+      requirements: ["REQ-005", "REQ-008"]
+      full_trace: "REQ-005,REQ-008 -> Phase-3.2 -> T014 -> MinecraftCommandExecutor.java"
+  - task_id: "T015"
+    description: "Capture bounded feedback and format results."
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "src/main/java/com/ligerbots/ligerblockschatbridge/commands/MinecraftCommandExecutor.java"
+          changes:
+            - change_type: "modified"
+              description: "Added bounded feedback capture and status formatting."
+    verification:
+      build_passed: true
+      test_results:
+        command: "./gradlew clean build"
+        passed: 19
+        failed: 0
+        skipped: 0
+        failures: []
+    upstream_trace:
+      plan_item: "3.2"
+      requirements: ["REQ-006"]
+      full_trace: "REQ-006 -> Phase-3.2 -> T015 -> MinecraftCommandExecutor.java"
+  - task_id: "T018"
+    description: "Deliver command results through the outbound Slack queue."
+    status: "completed"
+    implementation:
+      files_changed:
+        - file: "src/main/java/com/ligerbots/ligerblockschatbridge/LigerBlocksChatBridge.java"
+          changes:
+            - change_type: "modified"
+              description: "Wired executor results into OutboundMessageQueue."
+    verification:
+      build_passed: true
+      test_results:
+        command: "./gradlew clean build"
+        passed: 19
+        failed: 0
+        skipped: 0
+        failures: []
+    upstream_trace:
+      plan_item: "3.3"
+      requirements: ["REQ-006", "REQ-010"]
+      full_trace: "REQ-006,REQ-010 -> Phase-3.3 -> T018 -> LigerBlocksChatBridge.java"
+pending_tasks:
+  - task_id: "T024"
+    description: "Run final clean production validation."
+    blocked_by: ["T016", "T017", "T019", "T020", "T021", "T022", "T023"]
+    priority: "P1"
+  - task_id: "T025"
+    description: "Run Docker persistence and rollback validation."
+    blocked_by: ["T024"]
+    priority: "P1"
+  - task_id: "T026"
+    description: "Run Slack-side acceptance matrix."
+    blocked_by: ["T025"]
+    priority: "P1"
+  - task_id: "T027"
+    description: "Record final acceptance evidence."
+    blocked_by: ["T026"]
+    priority: "P1"
+untracked_changes: []
+traceability_chain:
+  - chain_id: "TRACE-003"
+    requirement: "REQ-004,REQ-005,REQ-006,REQ-008"
+    plan_phase: "Phase-3"
+    plan_item: "3.1,3.2,3.3"
+    tasks: ["T012", "T013", "T014", "T015", "T018"]
+    files:
+      - "src/main/java/com/ligerbots/ligerblockschatbridge/commands/CommandArgumentExpander.java"
+      - "src/main/java/com/ligerbots/ligerblockschatbridge/commands/MinecraftCommandExecutor.java"
+      - "src/main/java/com/ligerbots/ligerblockschatbridge/LigerBlocksChatBridge.java"
+    status: "partial"
+validation:
+  passed: true
+  errors: []
+  warnings:
+    - "Live integration and remaining Phase 3 test tasks are pending."
+  blocking_issues: []

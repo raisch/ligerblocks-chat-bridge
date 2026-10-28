@@ -6,6 +6,8 @@ public final class BridgeConfig {
     public static final ModConfigSpec SPEC;
     public static final ModConfigSpec.BooleanValue ENABLED;
     public static final ModConfigSpec.ConfigValue<String> CHANNEL_ID;
+    public static final ModConfigSpec.ConfigValue<String> SLACK_ICON_URL;
+    public static final ModConfigSpec.ConfigValue<String> SLACK_USERNAME;
     public static final ModConfigSpec.ConfigValue<String> MESSAGE_FORMAT;
     public static final ModConfigSpec.IntValue QUEUE_CAPACITY;
     public static final ModConfigSpec.BooleanValue JOIN_NOTIFICATIONS;
@@ -14,6 +16,10 @@ public final class BridgeConfig {
     public static final ModConfigSpec.BooleanValue ADVANCEMENT_NOTIFICATIONS;
     public static final ModConfigSpec.BooleanValue SERVER_START_NOTIFICATIONS;
     public static final ModConfigSpec.BooleanValue SERVER_STOP_NOTIFICATIONS;
+    public static final ModConfigSpec.BooleanValue USER_EVENTS;
+    public static final ModConfigSpec.BooleanValue SYSTEM_EVENTS;
+    public static final ModConfigSpec.BooleanValue MINECRAFT_TO_SLACK;
+    public static final ModConfigSpec.BooleanValue SLACK_TO_MINECRAFT;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -24,6 +30,12 @@ public final class BridgeConfig {
         CHANNEL_ID = builder
                 .comment("Slack channel ID receiving Minecraft chat messages.")
                 .define("channelId", "");
+        SLACK_ICON_URL = builder
+                .comment("HTTPS image URL used as the Slack message icon.")
+                .define("slackIconUrl", "https://ligerblocks.com/minecraft_slack_avatar_96x96.png");
+        SLACK_USERNAME = builder
+                .comment("Optional Slack username used for outbound messages.")
+                .define("slackUsername", "");
         MESSAGE_FORMAT = builder
                 .comment("Outbound format. Supported placeholders: {player}, {message}.")
                 .define("messageFormat", "<{player}> {message}");
@@ -48,6 +60,18 @@ public final class BridgeConfig {
         SERVER_STOP_NOTIFICATIONS = builder
                 .comment("Send a server-stop notification to Slack.")
                 .define("serverStopNotifications", true);
+        USER_EVENTS = builder
+                .comment("Enable Minecraft user events such as join, leave, death, and advancements.")
+                .define("userEvents", true);
+        SYSTEM_EVENTS = builder
+                .comment("Enable Minecraft system events such as server start and stop.")
+                .define("systemEvents", true);
+        MINECRAFT_TO_SLACK = builder
+                .comment("Enable Minecraft chat and events sent to Slack.")
+                .define("minecraftToSlack", true);
+        SLACK_TO_MINECRAFT = builder
+                .comment("Enable ordinary Slack messages sent to Minecraft.")
+                .define("slackToMinecraft", true);
         builder.pop();
         SPEC = builder.build();
     }
@@ -57,5 +81,35 @@ public final class BridgeConfig {
 
     static String validateRelay(String channelId, String messageFormat) {
         return RelayConfigValidator.validate(channelId, messageFormat);
+    }
+
+    static void setEvents(String scope, boolean enabled) {
+        switch (scope.toLowerCase(java.util.Locale.ROOT)) {
+            case "all" -> {
+                USER_EVENTS.set(enabled);
+                SYSTEM_EVENTS.set(enabled);
+            }
+            case "user" -> USER_EVENTS.set(enabled);
+            case "server" -> SYSTEM_EVENTS.set(enabled);
+            default -> throw new IllegalArgumentException("unsupported event scope: " + scope);
+        }
+    }
+
+    static String eventsStatus() {
+        return "user=" + (USER_EVENTS.get() ? "on" : "off")
+                + ", server=" + (SYSTEM_EVENTS.get() ? "on" : "off");
+    }
+
+    static void setMessages(String direction, boolean enabled) {
+        switch (direction.toLowerCase(java.util.Locale.ROOT)) {
+            case "from" -> MINECRAFT_TO_SLACK.set(enabled);
+            case "to" -> SLACK_TO_MINECRAFT.set(enabled);
+            default -> throw new IllegalArgumentException("unsupported message direction: " + direction);
+        }
+    }
+
+    static String messagesStatus() {
+        return "from=" + (MINECRAFT_TO_SLACK.get() ? "on" : "off")
+                + ", to=" + (SLACK_TO_MINECRAFT.get() ? "on" : "off");
     }
 }

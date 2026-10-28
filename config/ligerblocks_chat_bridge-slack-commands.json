@@ -1,0 +1,167 @@
+{
+  /*
+   * ============================
+   * Ligerblocks Chat Bridge Slack Commands Configuration
+   * 
+   * Install this file to the Minecraft server's configuration directory (/config/ligerblocks_chat_bridge-slack-commands.json)
+   *
+   * Configuration for Slack commands used by the Ligerblocks Chat Bridge
+   * Defines the commands, permissions, and arguments for Slack integration with the Ligerblocks Chat Bridge
+   *
+   * Command format is defined in COMMANDS.md
+   *
+   * Example usage:
+   *   /mc players
+   *   /mc daytime
+   *   /mc day
+   *   /mc whitelist list
+   *   /mc test-rest hello from Slack
+   *
+   * Note: Replace "SLACK_USERID" with the actual Slack user IDs of the admins.
+   *
+   * Comments in this file are stripped out before being processed by the Ligerblocks Chat Bridge.
+   */
+
+  // Slack user IDs who have elevated permissions
+  "admins": [
+    "SLACK_USERID"
+  ],
+
+  "commands": {
+    // General commands (available to all)
+    "players": {
+      "minecraft": "list",
+      "permission": "everyone",
+      "description": "Show current online players",
+      "aliases": [
+        "online"
+      ],
+      "response": "channel"
+    },
+    "daytime": {
+      "minecraft": "time query daytime",
+      "permission": "everyone",
+      "description": "Show the current daytime",
+      "response": "channel"
+    },
+
+    // Admin commands (available to admins)
+    "day": {
+      "minecraft": "time set day",
+      "permission": "admin",
+      "description": "Set the world time to day"
+    },
+    "noon": {
+      "minecraft": "time set noon",
+      "permission": "admin",
+      "description": "Set the world time to noon"
+    },
+    "night": {
+      "minecraft": "time set night",
+      "permission": "admin",
+      "description": "Set the world time to night"
+    },
+    "midnight": {
+      "minecraft": "time set midnight",
+      "permission": "admin",
+      "description": "Set the world time to midnight"
+    },
+    "whitelist": {
+      "minecraft": "whitelist {action} {player}",
+      "permission": "admin",
+      "description": "List, add, or remove whitelisted players",
+      "arguments": {
+        "action": {
+          "type": "option",
+          "required": true,
+          "options": [
+            "list",
+            "add",
+            "del"
+          ]
+        },
+        "player": {
+          "type": "minecraft_username",
+          "required": false,
+          "requiredWhen": {
+            "argument": "action",
+            "values": [
+              "add",
+              "del"
+            ]
+          }
+        }
+      }
+    },
+
+    // Test commands (available to admins) - these test various command argument shapes
+    "test-rest": {
+      "minecraft": "say {message}",
+      "permission": "admin",
+      "description": "Test a rest argument: /mc test-rest hello from Slack",
+      "arguments": {
+        "message": {
+          "type": "rest",
+          "required": true
+        }
+      }
+    },
+    "test-required-many": {
+      "minecraft": "say required={words}",
+      "permission": "admin",
+      "description": "Test one or more required arguments",
+      "arguments": {
+        "words": {
+          "type": "one_or_more",
+          "required": true
+        }
+      }
+    },
+    "test-optional-many": {
+      "minecraft": "say optional={words}",
+      "permission": "admin",
+      "description": "Test zero or more optional arguments",
+      "arguments": {
+        "words": {
+          "type": "optional_one_or_more",
+          "required": false
+        }
+      }
+    },
+    "test-option": {
+      "minecraft": "weather {weather}",
+      "permission": "admin",
+      "description": "Test a constrained option",
+      "arguments": {
+        "weather": {
+          "type": "option",
+          "required": true,
+          "options": [
+            "clear",
+            "rain",
+            "thunder"
+          ]
+        }
+      }
+    },
+    "test-many-option": {
+      "minecraft": "say words={words} style={style}",
+      "permission": "admin",
+      "description": "Test required arguments followed by an option",
+      "arguments": {
+        "words": {
+          "type": "one_or_more",
+          "required": true
+        },
+        "style": {
+          "type": "option",
+          "required": true,
+          "options": [
+            "plain",
+            "bold"
+          ]
+        }
+      }
+    }
+  }
+}

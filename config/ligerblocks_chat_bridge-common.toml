@@ -1,0 +1,27 @@
+[relay]
+#Enable outbound Minecraft chat relay to Slack.
+enabled = true
+#Slack channel ID receiving Minecraft chat messages.
+channelId = "SLACK_CHANNEL_ID"
+#Slack Username - optional
+slackUsername = "Minecraft"
+#HTTPS image URL used as the Slack message icon. - optional
+slackIconUrl = "https://ligerblocks.com/minecraft_slack_avatar_96x96.png"
+#Outbound format. Supported placeholders: {player}, {message}.
+messageFormat = "<{player}> {message}"
+#Maximum number of outbound messages waiting for delivery.
+# Default: 256
+# Range: 1 ~ 10000
+queueCapacity = 256
+#Send player join notifications to Slack.
+joinNotifications = true
+#Send player leave notifications to Slack.
+leaveNotifications = true
+#Send player death notifications to Slack.
+deathNotifications = true
+#Send advancement notifications to Slack.
+advancementNotifications = true
+#Send a server-start notification to Slack.
+serverStartNotifications = true
+#Send a server-stop notification to Slack.
+serverStopNotifications = true

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -32,6 +33,37 @@ class OutboundMessageQueueTest {
 
         queue.close();
         assertEquals(1, sends.get());
+    }
+
+    @Test
+    void sendsEphemeralResponsesToTheSlashCommandResponseUrl() throws InterruptedException {
+        AtomicReference<String> responseUrl = new AtomicReference<>();
+        AtomicReference<String> responseText = new AtomicReference<>();
+        SlackMessageClient client = new SlackMessageClient() {
+            @Override
+            public void sendMessage(String channelId, String text) {
+                throw new AssertionError("ephemeral response must not use channel delivery");
+            }
+
+            @Override
+            public void sendEphemeralResponse(String url, String text) {
+                responseUrl.set(url);
+                responseText.set(text);
+            }
+        };
+        OutboundMessageQueue queue = new OutboundMessageQueue(1, client);
+        queue.start();
+
+        assertTrue(queue.enqueue(OutboundMessage.ephemeral(
+                "https://hooks.slack.com/commands/example",
+                "Command completed")));
+        for (int attempt = 0; attempt < 20 && responseText.get() == null; attempt++) {
+            Thread.sleep(10);
+        }
+
+        queue.close();
+        assertEquals("https://hooks.slack.com/commands/example", responseUrl.get());
+        assertEquals("Command completed", responseText.get());
     }
 
     @Test

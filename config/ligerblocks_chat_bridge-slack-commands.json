@@ -153,6 +153,74 @@
           }
         }
       }
+    },
+    "test-rest": {
+      "minecraft": "say {message}",
+      "permission": "admin",
+      "description": "Test a rest argument",
+      "arguments": {
+        "message": {
+          "type": "rest",
+          "required": true
+        }
+      }
+    },
+    "test-required-many": {
+      "minecraft": "say required={words}",
+      "permission": "admin",
+      "description": "Test required one-or-more arguments",
+      "arguments": {
+        "words": {
+          "type": "one_or_more",
+          "required": true
+        }
+      }
+    },
+    "test-optional-many": {
+      "minecraft": "say optional={words}",
+      "permission": "admin",
+      "description": "Test optional one-or-more arguments",
+      "arguments": {
+        "words": {
+          "type": "optional_one_or_more",
+          "required": false
+        }
+      }
+    },
+    "test-option": {
+      "minecraft": "weather {weather}",
+      "permission": "admin",
+      "description": "Test a constrained option",
+      "arguments": {
+        "weather": {
+          "type": "option",
+          "required": true,
+          "options": [
+            "clear",
+            "rain",
+            "thunder"
+          ]
+        }
+      }
+    },
+    "test-many-option": {
+      "minecraft": "say words={words} style={style}",
+      "permission": "admin",
+      "description": "Test required arguments followed by an option",
+      "arguments": {
+        "words": {
+          "type": "one_or_more",
+          "required": true
+        },
+        "style": {
+          "type": "option",
+          "required": true,
+          "options": [
+            "bold",
+            "italic"
+          ]
+        }
+      }
     }
   }
 }
